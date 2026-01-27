@@ -1,0 +1,83 @@
+name: smart_vision_device_app
+description: "Professional Smart Vision Onboarding & Configuration Device Application."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # State Management & DI
+  get: ^4.7.3
+  get_it: ^7.6.4
+  get_storage: ^2.1.1
+  
+  # Network & API
+  http: ^1.2.2
+  dio: ^5.9.0
+  pretty_dio_logger: ^1.4.0
+  connectivity_plus: ^7.0.0
+  wifi_iot: ^0.3.19+2
+  
+  # Firebase Services
+  firebase_core: ^3.1.0
+  firebase_messaging: ^15.1.0
+  firebase_crashlytics: ^4.1.0
+  firebase_analytics: ^11.1.0
+  
+  # Video & Hardware
+  media_kit: ^1.1.10
+  media_kit_video: ^1.1.11
+  media_kit_libs_video: ^1.0.4
+  ffmpeg_kit_flutter_new_min: ^2.1.0
+  device_info_plus: ^11.1.0
+  package_info_plus: ^8.1.2
+  
+  # AI Inference
+  ultralytics_yolo:
+    git:
+      url: https://github.com/ultralytics/ultralytics_yolo.git
+      ref: main
+  logger: ^2.5.0
+  
+  # Utils & UI
+  intl: ^0.20.2
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  async: ^2.11.0
+  uuid: ^4.5.1
+  crypto: ^3.0.6
+  google_fonts: ^6.2.1
+  qr_flutter: ^4.1.0
+  permission_handler: ^11.3.1
+  url_launcher: ^6.3.1
+  image: ^4.5.4
+  
+  # Data Persistence
+  shared_preferences: ^2.3.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/
+    - assets/images/
+
+  # Google Fonts are handled dynamically by the google_fonts package, 
+  # but we can pre-include them if offline support is needed.

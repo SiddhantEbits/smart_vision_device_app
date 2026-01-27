@@ -1,0 +1,78 @@
+Resolving dependencies...
+Downloading packages...
+  _flutterfire_internals 1.3.59 (1.3.66 available)
+  characters 1.4.0 (1.4.1 available)
+  device_info_plus 11.5.0 (12.3.0 available)
+  ffmpeg_kit_flutter_new_min 2.1.0 (3.1.0 available)
+  firebase_analytics 11.6.0 (12.1.1 available)
+  firebase_analytics_platform_interface 4.4.3 (5.0.6 available)
+  firebase_analytics_web 0.5.10+16 (0.6.1+2 available)
+  firebase_core 3.15.2 (4.4.0 available)
+  firebase_core_web 2.24.1 (3.4.0 available)
+  firebase_crashlytics 4.3.10 (5.0.7 available)
+  firebase_crashlytics_platform_interface 3.8.10 (3.8.17 available)
+  firebase_messaging 15.2.10 (16.1.1 available)
+  firebase_messaging_platform_interface 4.6.10 (4.7.6 available)
+  firebase_messaging_web 3.10.10 (4.1.2 available)
+  flutter_lints 5.0.0 (6.0.0 available)
+  get_it 7.7.0 (9.2.0 available)
+  google_fonts 6.3.3 (8.0.0 available)
+  lints 5.1.1 (6.0.0 available)
+  matcher 0.12.17 (0.12.18 available)
+  material_color_utilities 0.11.1 (0.13.0 available)
+  media_kit_video 1.3.1 (2.0.1 available)
+  meta 1.17.0 (1.18.0 available)
+  package_info_plus 8.3.1 (9.0.0 available)
+  permission_handler 11.4.0 (12.0.1 available)
+  permission_handler_android 12.1.0 (13.0.1 available)
+  test_api 0.7.7 (0.7.9 available)
+  wakelock_plus 1.3.3 (1.4.0 available)
+Got dependencies!
+27 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing smart_vision_device_app...                            
+
+   info • The imported package 'logger' isn't a dependency of the importing package • lib/core/logging/logger_service.dart:1:8 • depend_on_referenced_packages
+  error • Target of URI doesn't exist: 'package:logger/logger.dart' • lib/core/logging/logger_service.dart:1:8 • uri_does_not_exist
+  error • Undefined class 'Logger' • lib/core/logging/logger_service.dart:4:16 • undefined_class
+  error • The method 'Logger' isn't defined for the type 'LoggerService' • lib/core/logging/logger_service.dart:4:33 • undefined_method
+  error • The method 'PrettyPrinter' isn't defined for the type 'LoggerService' • lib/core/logging/logger_service.dart:5:14 • undefined_method
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:23:9 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:28:9 • deprecated_member_use
+  error • The argument type 'CardTheme' can't be assigned to the parameter type 'CardThemeData?'.  • lib/core/theme/app_theme.dart:52:18 • argument_type_not_assignable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:57:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:78:25 • deprecated_member_use
+  error • The argument type 'BorderSide' can't be assigned to the parameter type 'BoxBorder?'.  • lib/core/theme/app_theme.dart:80:13 • argument_type_not_assignable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:80:44 • deprecated_member_use
+warning • A value for optional parameter 'counted' isn't ever given • lib/data/services/detection/footfall_tracker.dart:114:10 • unused_element_parameter
+  error • The name 'Offset' isn't a class • lib/data/services/detection_engine.dart:109:24 • creation_with_non_type
+  error • Undefined name 'Rect' • lib/data/services/detection_engine.dart:125:17 • undefined_identifier
+warning • Unused import: 'package:flutter/foundation.dart' • lib/data/services/snapshot_manager.dart:2:8 • unused_import
+  error • Target of URI doesn't exist: '../constants/app_constants.dart' • lib/data/services/whatsapp_service.dart:4:8 • uri_does_not_exist
+  error • Undefined name 'AppConstants' • lib/data/services/whatsapp_service.dart:13:28 • undefined_identifier
+  error • Undefined name 'AppConstants' • lib/data/services/whatsapp_service.dart:14:55 • undefined_identifier
+  error • Undefined name 'AppConstants' • lib/data/services/whatsapp_service.dart:34:26 • undefined_identifier
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/data/services/yolo_service.dart:2:8 • unnecessary_import
+   info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/data/services/yolo_service.dart:4:8 • unnecessary_import
+warning • Unused import: '../models/detected_object.dart' • lib/data/services/yolo_service.dart:14:8 • unused_import
+  error • The name 'ObjectDetectionResult' isn't a type, so it can't be used as a type argument • lib/data/services/yolo_service.dart:70:10 • non_type_as_type_argument
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/alert_config_queue_screen.dart:273:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/alert_config_queue_screen.dart:298:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/widgets/roi/footfall_painter.dart:28:30 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera_setup/views/camera_setup_screen.dart:34:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera_setup/views/camera_setup_screen.dart:53:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/detection_config/views/detection_selection_screen.dart:122:65 • deprecated_member_use
+warning • Unused import: '../../../data/models/roi_config_model.dart' • lib/features/monitoring/controller/monitoring_controller.dart:9:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/monitoring/views/widgets/detection_overlay.dart:83:24 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/monitoring/views/widgets/detection_overlay.dart:84:26 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/network_config_screen.dart:26:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/qr_scan_screen.dart:29:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/qr_scan_screen.dart:63:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:29:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:48:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:72:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:107:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:112:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/whatsapp_setup_screen.dart:25:51 • deprecated_member_use
+
+42 issues found. (ran in 2.6s)

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "407893161802",
+    "project_id": "smart-vision-6d121",
+    "storage_bucket": "smart-vision-6d121.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407893161802:android:c857d982b27c5443a0f3b3",
+        "android_client_info": {
+          "package_name": "com.app.smart_vision"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLYT8Bom89wwHP5jDVzWzhvnJmVLQLXr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407893161802:android:f3a9d4e4f6e3cbdda0f3b3",
+        "android_client_info": {
+          "package_name": "com.deviceapp.smart_vision"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLYT8Bom89wwHP5jDVzWzhvnJmVLQLXr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

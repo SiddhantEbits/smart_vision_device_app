@@ -1,0 +1,36 @@
+Analyzing smart_vision_device_app...                            
+
+   info • 'printTime' is deprecated and shouldn't be used. Use `dateTimeFormat` with `DateTimeFormat.onlyTimeAndSinceStart` or `DateTimeFormat.none` instead • lib/core/logging/logger_service.dart:11:7 • deprecated_member_use
+   info • 'v' is deprecated and shouldn't be used. [Level.verbose] is being deprecated in favor of [Level.trace], use [t] instead • lib/core/logging/logger_service.dart:20:44 • deprecated_member_use
+   info • 'background' is deprecated and shouldn't be used. Use surface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:23:9 • deprecated_member_use
+   info • 'onBackground' is deprecated and shouldn't be used. Use onSurface instead. This feature was deprecated after v3.18.0-0.1.pre • lib/core/theme/app_theme.dart:28:9 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:57:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:78:25 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/core/theme/app_theme.dart:80:44 • deprecated_member_use
+warning • A value for optional parameter 'counted' isn't ever given • lib/data/services/detection/footfall_tracker.dart:114:10 • unused_element_parameter
+warning • Duplicate import • lib/data/services/detection_engine.dart:2:8 • duplicate_import
+warning • Unused import: 'package:flutter/foundation.dart' • lib/data/services/snapshot_manager.dart:2:8 • unused_import
+   info • The import of 'dart:typed_data' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/data/services/yolo_service.dart:2:8 • unnecessary_import
+   info • The import of 'package:flutter/foundation.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/services.dart' • lib/data/services/yolo_service.dart:4:8 • unnecessary_import
+warning • Unused import: '../models/detected_object.dart' • lib/data/services/yolo_service.dart:14:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/alert_config_queue_screen.dart:273:57 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/alert_config_queue_screen.dart:298:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/alert_config/views/widgets/roi/footfall_painter.dart:28:30 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera_setup/views/camera_setup_screen.dart:34:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/camera_setup/views/camera_setup_screen.dart:53:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/detection_config/views/detection_selection_screen.dart:122:65 • deprecated_member_use
+warning • Unused import: '../../../data/models/roi_config_model.dart' • lib/features/monitoring/controller/monitoring_controller.dart:9:8 • unused_import
+  error • The getter 'boxes' isn't defined for the type 'Map<String, dynamic>' • lib/features/monitoring/controller/monitoring_controller.dart:101:29 • undefined_getter
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/monitoring/views/widgets/detection_overlay.dart:83:24 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/monitoring/views/widgets/detection_overlay.dart:84:26 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/network_config_screen.dart:26:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/qr_scan_screen.dart:29:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/qr_scan_screen.dart:63:56 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:29:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:48:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:72:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:107:66 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/welcome_screen.dart:112:47 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/onboarding/views/whatsapp_setup_screen.dart:25:51 • deprecated_member_use
+
+32 issues found. (ran in 3.0s)
