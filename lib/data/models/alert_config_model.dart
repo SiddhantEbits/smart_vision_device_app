@@ -24,6 +24,14 @@ class AlertSchedule {
     'endTime': endTime,
     'days': days,
   };
+
+  static AlertSchedule fromMap(Map<String, dynamic> map) {
+    return AlertSchedule(
+      startTime: map['startTime'] ?? '00:00',
+      endTime: map['endTime'] ?? '23:59',
+      days: List<int>.from(map['days'] ?? [1, 2, 3, 4, 5, 6, 7]),
+    );
+  }
 }
 
 class AlertConfig {

@@ -27,15 +27,8 @@ class AlertFlowController extends GetxController {
   }
 
   void finishSetup() {
-    final monitoring = Get.put(MonitoringController());
-    final cameraSetup = Get.find<CameraSetupController>();
-    
-    monitoring.startMonitoring(
-      rtspUrl: cameraSetup.rtspUrl.value,
-      configs: configs.values.toList(),
-    );
-    
-    Get.offAllNamed(AppRoutes.dashboard);
+    // Navigate to camera setup finish screen instead of dashboard
+    Get.offAllNamed(AppRoutes.cameraSetupFinish);
   }
 
   void nextAlert() {

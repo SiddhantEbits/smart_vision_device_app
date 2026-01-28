@@ -17,6 +17,7 @@ import 'data/services/snapshot_manager.dart';
 import 'data/services/rtsp_snapshot_service.dart';
 import 'data/services/camera_log_service.dart';
 import 'core/utils/cooldown_manager.dart';
+import 'features/camera_setup/controller/camera_setup_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,5 +79,12 @@ class GlobalBinding extends Bindings {
     Get.put(YoloService(), permanent: true);
     Get.put(WhatsAppAlertService(), permanent: true);
     Get.put(AlertManager(), permanent: true);
+    
+    // Camera Management
+    Get.put(CameraSetupController(), permanent: true);
+    
+    // Initialize YOLO model asynchronously
+    final yoloService = Get.find<YoloService>();
+    yoloService.initModel();
   }
 }

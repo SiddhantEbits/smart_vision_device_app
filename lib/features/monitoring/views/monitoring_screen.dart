@@ -23,10 +23,20 @@ class MonitoringScreen extends GetView<MonitoringController> {
             child: Container(
               color: Colors.black,
               child: Center(
-                child: Video(
-                  controller: controller.videoController,
-                  controls: NoVideoControls,
-                ),
+                child: Obx(() {
+                  if (controller.videoController != null) {
+                    return Video(
+                      controller: controller.videoController!,
+                      controls: NoVideoControls,
+                    );
+                  } else {
+                    return Icon(
+                      Icons.videocam_off,
+                      size: 60.adaptSize,
+                      color: Colors.white54,
+                    );
+                  }
+                }),
               ),
             ),
           ),
@@ -145,6 +155,17 @@ class MonitoringScreen extends GetView<MonitoringController> {
             controller.isStreaming.value ? Icons.stop : Icons.play_arrow,
             size: 24.adaptSize,
           )),
+        ),
+        SizedBox(height: 16.adaptSize),
+        FloatingActionButton(
+          onPressed: () async {
+            // Stop the stream, YOLO, and FFmpeg before navigating
+            await controller.stopMonitoring();
+            // Navigate to next configuration screen
+            Get.toNamed('/detection-selection');
+          },
+          backgroundColor: AppTheme.successColor,
+          child: Icon(Icons.arrow_forward, size: 24.adaptSize),
         ),
       ],
     );

@@ -39,10 +39,11 @@ class WelcomeScreen extends StatelessWidget {
                   // Left Side: Text and CTA
                   Flexible(
                     flex: 1,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                         Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 16.adaptSize,
@@ -97,6 +98,7 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
                     ),
                   ),
                   

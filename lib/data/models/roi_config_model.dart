@@ -57,4 +57,13 @@ class RoiAlertConfig {
 
   @override
   int get hashCode => roi.hashCode ^ lineStart.hashCode ^ lineEnd.hashCode ^ direction.hashCode;
+
+  /// True when config is intended for FOOTFALL
+  bool get isFootfall =>
+      lineStart != Offset.zero &&
+          lineEnd != Offset.zero &&
+          direction != Offset.zero;
+
+  /// True when config is intended for ROI-only alerts
+  bool get isRestrictedArea => !isFootfall;
 }

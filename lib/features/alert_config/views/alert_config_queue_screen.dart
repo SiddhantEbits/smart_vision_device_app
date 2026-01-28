@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/alert_flow_controller.dart';
 import '../../../data/models/alert_config_model.dart';
-import '../../../data/models/roi_config_model.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
-import 'widgets/roi/footfall_canvas.dart';
 
 class AlertConfigQueueScreen extends StatefulWidget {
   const AlertConfigQueueScreen({super.key});
@@ -16,12 +14,52 @@ class AlertConfigQueueScreen extends StatefulWidget {
 
 class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
   final AlertFlowController flowController = Get.find<AlertFlowController>();
-  RoiAlertConfig roiConfig = RoiAlertConfig.forFootfall();
+  
+  // Form controllers and state
+  late TextEditingController _sensitivityController;
+  late TextEditingController _cooldownController;
+  late TextEditingController _maxCapacityController;
+  late TextEditingController _absentIntervalController;
+  
+  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 18, minute: 0);
+  List<int> _selectedDays = [1, 2, 3, 4, 5, 6, 7]; // All days selected by default
+  bool _schedulingEnabled = true;
+  
+  // Handle reconfigure detection type
+  DetectionType? _reconfigureDetectionType;
+  
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllers();
+    _handleArguments();
+  }
+  
+  void _handleArguments() {
+    // Check if we're being called with a specific detection type (for reconfigure)
+    final arguments = Get.arguments as Map<String, dynamic>?;
+    if (arguments != null && arguments.containsKey('detectionType')) {
+      _reconfigureDetectionType = arguments['detectionType'] as DetectionType;
+    }
+  }
+  
+  DetectionType get currentDetectionType {
+    // If reconfigure detection type is set, use that, otherwise use flow controller
+    return _reconfigureDetectionType ?? flowController.currentAlert!;
+  }
+  
+  void _initializeControllers() {
+    _sensitivityController = TextEditingController(text: '0.5');
+    _cooldownController = TextEditingController(text: '30');
+    _maxCapacityController = TextEditingController(text: '5');
+    _absentIntervalController = TextEditingController(text: '60');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final currentType = flowController.currentAlert;
+      final currentType = currentDetectionType;
       if (currentType == null) return const Center(child: CircularProgressIndicator());
 
       return Scaffold(
@@ -32,36 +70,52 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
           ),
           automaticallyImplyLeading: false,
         ),
-        body: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height),
-            child: Column(
-              children: [
-                _buildConfigContent(currentType),
-                
-                // Bottom Actions
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 48.adaptSize,
-                    vertical: 24.adaptSize,
+        body: Stack(
+          children: [
+            // Main Content - Scrollable
+            SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(24.adaptSize),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height - 100.adaptSize,
                   ),
-                  color: AppTheme.surfaceColor,
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: _saveAndContinue,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: Size(200.adaptSize, 56.adaptSize),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Side - Parameters
+                        Expanded(
+                          flex: 2,
+                          child: _buildParametersSection(currentType),
                         ),
-                        child: Text(flowController.isLastAlert ? 'FINISH SETUP' : 'NEXT ALERT'),
-                      ),
-                    ],
+                        
+                        SizedBox(width: 24.adaptSize),
+                        
+                        // Right Side - Scheduling
+                        Expanded(
+                          flex: 1,
+                          child: _buildSchedulingSection(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            
+            // Floating NEXT Button
+            Positioned(
+              bottom: 24.adaptSize,
+              right: 24.adaptSize,
+              child: FloatingActionButton.extended(
+                onPressed: _saveAndContinue,
+                backgroundColor: AppTheme.primaryColor,
+                icon: Icon(Icons.arrow_forward),
+                label: Text(flowController.isLastAlert ? 'FINISH' : 'NEXT'),
+              ),
+            ),
+          ],
         ),
       );
     });
@@ -78,108 +132,445 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
   }
 
   void _saveAndContinue() {
-    final currentType = flowController.currentAlert!;
+    final currentType = currentDetectionType;
     
-    // Save the config built in this step
+    // Collect form data
+    final sensitivity = double.tryParse(_sensitivityController.text) ?? 0.5;
+    final cooldown = int.tryParse(_cooldownController.text) ?? 30;
+    
+    // Create alert schedule
+    AlertSchedule schedule;
+    if (_schedulingEnabled) {
+      schedule = AlertSchedule(
+        startTime: '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
+        endTime: '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
+        days: _selectedDays,
+      );
+    } else {
+      // Always active - full day, every day
+      schedule = AlertSchedule(
+        startTime: '00:00',
+        endTime: '23:59',
+        days: [1, 2, 3, 4, 5, 6, 7],
+      );
+    }
+    
+    // Get detection-specific values
+    Map<String, dynamic> additionalParams = {};
+    switch (currentType) {
+      case DetectionType.crowdDetection:
+        additionalParams['maxCapacity'] = int.tryParse(_maxCapacityController.text) ?? 5;
+        break;
+      case DetectionType.absentAlert:
+        additionalParams['absentInterval'] = int.tryParse(_absentIntervalController.text) ?? 60;
+        break;
+      case DetectionType.footfallDetection:
+      case DetectionType.restrictedArea:
+        // ROI will be handled in separate screen
+        break;
+      case DetectionType.sensitiveAlert:
+        break;
+    }
+    
+    // Save the config built in this step (without ROI for now)
     flowController.saveConfig(AlertConfig(
       type: currentType,
-      schedule: AlertSchedule(startTime: '00:00', endTime: '23:59', days: [1,2,3,4,5,6,7]),
-      roiPoints: [roiConfig.lineStart, roiConfig.lineEnd], // Using simplified mapping for now
-      // ... (other params from UI state)
+      threshold: sensitivity,
+      cooldown: cooldown,
+      schedule: schedule,
+      maxCapacity: additionalParams['maxCapacity'],
+      interval: additionalParams['absentInterval'],
+      roiPoints: null, // Will be set in ROI screen
+      roiType: null, // Will be set in ROI screen
     ));
 
-    if (flowController.isLastAlert) {
-       flowController.finishSetup();
-    } else {
-      flowController.nextAlert();
-      setState(() {
-        roiConfig = RoiAlertConfig.forFootfall(); // Reset for next
+    // Check if we need to go to ROI screen or go to testing
+    if (currentType == DetectionType.footfallDetection || currentType == DetectionType.restrictedArea) {
+      // Navigate to ROI screen
+      Get.toNamed('/roi-setup', arguments: {
+        'detectionType': currentType,
+        'onComplete': (List<Offset> roiPoints, String roiType) {
+          // Update the last saved config with ROI data
+          final currentType = currentDetectionType;
+          if (flowController.configs.containsKey(currentType)) {
+            final lastConfig = flowController.configs[currentType]!;
+            final updatedConfig = AlertConfig(
+              type: lastConfig.type,
+              threshold: lastConfig.threshold,
+              cooldown: lastConfig.cooldown,
+              schedule: lastConfig.schedule,
+              maxCapacity: lastConfig.maxCapacity,
+              interval: lastConfig.interval,
+              roiPoints: roiPoints,
+              roiType: roiType,
+            );
+            flowController.configs[currentType] = updatedConfig;
+          }
+          
+          // Go to testing screen
+          _goToTestingScreen();
+        }
       });
+    } else {
+      // Go directly to testing screen for non-ROI detections
+      _goToTestingScreen();
     }
   }
 
-  Widget _buildConfigContent(DetectionType type) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(48.adaptSize),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Common Parameters for all detection types
-          Text(
-            'Common Parameters',
-            style: TextStyle(
-              fontSize: 20.adaptSize,
-              fontWeight: FontWeight.bold,
+  void _goToTestingScreen() {
+    // Navigate to testing screen with the current detection config
+    Get.toNamed('/detection-testing', arguments: {
+      'detectionType': currentDetectionType,
+      'config': flowController.configs[currentDetectionType]!,
+      'onTestComplete': (bool isSuccessful) {
+        if (isSuccessful) {
+          // Test successful, move to next detection or finish
+          if (flowController.isLastAlert) {
+            flowController.finishSetup();
+          } else {
+            flowController.nextAlert();
+            setState(() {
+              _initializeControllers(); // Reset controllers
+            });
+          }
+        } else {
+          // Test failed, user wants to reconfigure - do nothing, stay on current detection
+          // User can modify the config and test again
+        }
+      },
+      'onReconfigure': () {
+        // User wants to reconfigure - just return to this screen
+        // No action needed as we're already here
+      },
+    });
+  }
+
+  Widget _buildParametersSection(DetectionType type) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Detection Type Title
+        Text(
+          _getTitle(type),
+          style: TextStyle(
+            fontSize: 18.adaptSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 16.adaptSize),
+        
+        // Parameters
+        _buildTextField('Sensitivity Threshold', _sensitivityController),
+        SizedBox(height: 12.adaptSize),
+        _buildTextField('Alert Cooldown (seconds)', _cooldownController),
+        SizedBox(height: 12.adaptSize),
+        
+        // Detection-specific parameters
+        _buildDetectionSpecificTextFields(type),
+        
+        // ROI Setup for detection types that need it - Show only info message
+        if (type == DetectionType.footfallDetection || type == DetectionType.restrictedArea) ...[
+          SizedBox(height: 16.adaptSize),
+          Container(
+            padding: EdgeInsets.all(16.adaptSize),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.adaptSize),
+              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.crop_free,
+                  color: AppTheme.primaryColor,
+                  size: 20.adaptSize,
+                ),
+                SizedBox(width: 12.adaptSize),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ROI Configuration',
+                        style: TextStyle(
+                          fontSize: 14.adaptSize,
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4.adaptSize),
+                      Text(
+                        'ROI will be configured on the next screen',
+                        style: TextStyle(
+                          fontSize: 12.adaptSize,
+                          color: AppTheme.primaryColor.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: AppTheme.primaryColor,
+                  size: 16.adaptSize,
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 24.adaptSize),
-          _buildSliderSetting('Sensitivity Threshold', 0.5, '0.1', '1.0'),
-          _buildSliderSetting('Alert Cooldown (seconds)', 30, '5', '300'),
-          SizedBox(height: 48.adaptSize),
-          
-          // Scheduling
-          Text(
-            'Scheduling',
-            style: TextStyle(
-              fontSize: 20.adaptSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 24.adaptSize),
-          Row(
-            children: [
-              _buildTimePicker('Start Time', '09:00'),
-              SizedBox(width: 24.adaptSize),
-              _buildTimePicker('End Time', '18:00'),
-            ],
-          ),
-          
-          // Detection-specific parameters
-          _buildDetectionSpecificFields(type),
-          
-          // ROI Setup for detection types that need it
-          if (type == DetectionType.footfallDetection || type == DetectionType.restrictedArea) ...[
-            SizedBox(height: 48.adaptSize),
-            _buildROISection(type),
-          ],
         ],
-      ),
+      ],
     );
   }
-  
-  Widget _buildDetectionSpecificFields(DetectionType type) {
+
+  Widget _buildSchedulingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Alert Scheduling',
+          style: TextStyle(
+            fontSize: 16.adaptSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 16.adaptSize),
+        
+        // Scheduling Toggle
+        Row(
+          children: [
+            Text(
+              'Enable Scheduling',
+              style: TextStyle(
+                fontSize: 14.adaptSize,
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(width: 12.adaptSize),
+            Switch(
+              value: _schedulingEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _schedulingEnabled = value;
+                });
+              },
+              activeColor: AppTheme.primaryColor,
+            ),
+          ],
+        ),
+        SizedBox(height: 16.adaptSize),
+        
+        // Conditional content based on toggle
+        if (_schedulingEnabled) ...[
+          // Time Pickers
+          _buildTimeTextField('Start Time', _startTime, (time) => setState(() => _startTime = time)),
+          SizedBox(height: 12.adaptSize),
+          _buildTimeTextField('End Time', _endTime, (time) => setState(() => _endTime = time)),
+          SizedBox(height: 16.adaptSize),
+          
+          // Days Selection
+          Text(
+            'Active Days',
+            style: TextStyle(
+              fontSize: 14.adaptSize,
+              fontWeight: FontWeight.w600,
+              color: Colors.white70,
+            ),
+          ),
+          SizedBox(height: 8.adaptSize),
+          
+          Wrap(
+            spacing: 6.adaptSize,
+            runSpacing: 6.adaptSize,
+            children: [
+              {'day': 'Mon', 'value': 1},
+              {'day': 'Tue', 'value': 2},
+              {'day': 'Wed', 'value': 3},
+              {'day': 'Thu', 'value': 4},
+              {'day': 'Fri', 'value': 5},
+              {'day': 'Sat', 'value': 6},
+              {'day': 'Sun', 'value': 7},
+            ].map((dayData) {
+              final day = dayData['day'] as String;
+              final value = dayData['value'] as int;
+              return FilterChip(
+                label: Text(day, style: TextStyle(fontSize: 10.adaptSize)),
+                selected: _selectedDays.contains(value),
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedDays.add(value);
+                    } else {
+                      _selectedDays.remove(value);
+                    }
+                  });
+                },
+                backgroundColor: Colors.white.withOpacity(0.1),
+                selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                labelStyle: TextStyle(color: Colors.white70),
+              );
+            }).toList(),
+          ),
+        ] else ...[
+          // Always Active Message
+          Container(
+            padding: EdgeInsets.all(16.adaptSize),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.adaptSize),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.access_time_filled,
+                  color: Colors.green,
+                  size: 20.adaptSize,
+                ),
+                SizedBox(width: 12.adaptSize),
+                Text(
+                  'Always Active',
+                  style: TextStyle(
+                    fontSize: 16.adaptSize,
+                    color: Colors.green,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '24/7 Monitoring',
+                  style: TextStyle(
+                    fontSize: 12.adaptSize,
+                    color: Colors.green.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.adaptSize,
+            color: Colors.white70,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SizedBox(height: 6.adaptSize),
+        TextField(
+          controller: controller,
+          style: TextStyle(
+            fontSize: 14.adaptSize,
+            color: Colors.white,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: AppTheme.primaryColor),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 12.adaptSize,
+              vertical: 10.adaptSize,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeTextField(String label, TimeOfDay time, Function(TimeOfDay) onTimeChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.adaptSize,
+            color: Colors.white70,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SizedBox(height: 6.adaptSize),
+        TextField(
+          readOnly: true,
+          controller: TextEditingController(
+            text: '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+          ),
+          style: TextStyle(
+            fontSize: 14.adaptSize,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.05),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6.adaptSize),
+              borderSide: BorderSide(color: AppTheme.primaryColor),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 12.adaptSize,
+              vertical: 10.adaptSize,
+            ),
+            suffixIcon: Icon(Icons.access_time, size: 18.adaptSize, color: Colors.white54),
+          ),
+          onTap: () async {
+            final TimeOfDay? picked = await showTimePicker(
+              context: context,
+              initialTime: time,
+            );
+            if (picked != null) {
+              onTimeChanged(picked);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetectionSpecificTextFields(DetectionType type) {
     switch (type) {
       case DetectionType.crowdDetection:
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 48.adaptSize),
-            Text(
-              'Crowd Settings',
-              style: TextStyle(
-                fontSize: 20.adaptSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 24.adaptSize),
-            _buildSliderSetting('Max Capacity', 5, '2', '50'),
+            _buildTextField('Max Capacity', _maxCapacityController),
+            SizedBox(height: 12.adaptSize),
           ],
         );
         
       case DetectionType.absentAlert:
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 48.adaptSize),
-            Text(
-              'Absent Settings',
-              style: TextStyle(
-                fontSize: 20.adaptSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 24.adaptSize),
-            _buildSliderSetting('Absent Interval (seconds)', 60, '10', '600'),
+            _buildTextField('Absent Interval (seconds)', _absentIntervalController),
+            SizedBox(height: 12.adaptSize),
           ],
         );
         
@@ -189,138 +580,6 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
         // These don't have additional specific fields beyond ROI
         return const SizedBox();
     }
-  }
-  
-  Widget _buildROISection(DetectionType type) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'ROI Setup',
-          style: TextStyle(
-            fontSize: 20.adaptSize,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 24.adaptSize),
-        Container(
-          height: 300.adaptSize,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(24.adaptSize),
-            border: Border.all(color: Colors.white10),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24.adaptSize),
-            child: Stack(
-              children: [
-                // Live stream placeholder
-                Center(
-                  child: Opacity(
-                    opacity: 0.3,
-                    child: Icon(
-                      Icons.videocam,
-                      size: 80.adaptSize,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                
-                FootfallCanvas(
-                  config: roiConfig,
-                  onChanged: (newConfig) {
-                    setState(() => roiConfig = newConfig);
-                  },
-                  showLine: type == DetectionType.footfallDetection,
-                ),
-                
-                Positioned(
-                  top: 16.adaptSize,
-                  right: 16.adaptSize,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.adaptSize,
-                      vertical: 6.adaptSize,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8.adaptSize),
-                    ),
-                    child: Text(
-                      type == DetectionType.footfallDetection 
-                          ? 'Adjust ROI box and Crossing Line'
-                          : 'Adjust Restricted Area ROI',
-                      style: TextStyle(
-                        fontSize: 12.adaptSize,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSliderSetting(String title, double value, String min, String max) {
-    final minValue = double.tryParse(min) ?? 0.0;
-    final maxValue = double.tryParse(max) ?? 1.0;
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(color: Colors.white70)),
-        Row(
-          children: [
-            Text(min),
-            SizedBox(
-              width: 200.adaptSize,
-              child: Slider(
-                value: value.clamp(minValue, maxValue),
-                min: minValue,
-                max: maxValue,
-                onChanged: (_) {},
-                divisions: 10,
-              ),
-            ),
-            Text(max),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimePicker(String label, String time) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 24.adaptSize,
-        vertical: 16.adaptSize,
-      ),
-      decoration: AppTheme.glassDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.adaptSize,
-              color: AppTheme.mutedTextColor,
-            ),
-          ),
-          SizedBox(height: 4.adaptSize),
-          Text(
-            time,
-            style: TextStyle(
-              fontSize: 18.adaptSize,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
 }

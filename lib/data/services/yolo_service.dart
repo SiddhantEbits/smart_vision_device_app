@@ -13,6 +13,7 @@ import '../../core/logging/logger_service.dart';
 
 class YoloService extends GetxService {
   YOLO? _yolo;
+  bool _busy = false;
   final RxBool isModelLoaded = false.obs;
   final RxBool isProcessing = false.obs;
   final RxDouble downloadProgress = 0.0.obs;
@@ -25,13 +26,13 @@ class YoloService extends GetxService {
   }
 
   Future<bool> initModel() async {
-    status.value = 'Loading Detection Model...';
+    _status("Loading Detection Model...");
     LoggerService.i(status.value);
 
     try {
-      final path = await _getModelPath();
+      final path = await _getModelFile();
       if (path == null) {
-        status.value = 'Model file not found';
+        _status("Model file not found");
         return false;
       }
 
@@ -41,34 +42,41 @@ class YoloService extends GetxService {
         useGpu: AppConstants.useGpu,
       );
 
-      final success = await _yolo!.loadModel();
-      isModelLoaded.value = success;
-      status.value = success ? 'Detection ready' : 'Detection failed';
+      final ok = await _yolo!.loadModel();
+      isModelLoaded.value = ok;
+      _status(ok ? "Detection ready" : "Detection failed");
       
-      if (!success) {
+      if (!ok) {
         CrashLogger().logDetectionError(
           error: 'Failed to load TFLite model',
-          operation: 'initModel',
+          operation: 'loadModel',
         );
       }
       
-      LoggerService.i('YOLO Init: ${status.value}');
-      return success;
+      return ok;
     } catch (e, stackTrace) {
-      status.value = 'Initialization Error';
+      debugPrint("Detection error: $e\n$stackTrace");
+      
       CrashLogger().logDetectionError(
         error: e.toString(),
-        operation: 'initModel',
+        operation: 'loadModel',
         stackTrace: stackTrace,
       );
+      
       return false;
     }
   }
 
-  Future<Map<String, dynamic>?> predict(Uint8List imageBytes, {double confidence = 0.5}) async {
-    if (_yolo == null || isProcessing.value) return null;
+  // ==================================================
+  // PREDICT
+  // ==================================================
+  Future<Map<String, dynamic>?> predict(
+      Uint8List imageBytes, {
+        required double confidence,
+      }) async {
+    if (_yolo == null || _busy) return null;
 
-    isProcessing.value = true;
+    _busy = true;
     try {
       final result = await _yolo!.predict(
         imageBytes,
@@ -76,60 +84,70 @@ class YoloService extends GetxService {
         iouThreshold: AppConstants.iouThreshold,
       );
       
+      // Log successful prediction for debugging
+      if (kDebugMode && result != null) {
+        final detections = result['detections'] as List? ?? [];
+        debugPrint('[DETECTION] Prediction successful: ${detections.length} detections');
+      }
+      
       return result;
     } catch (e, stackTrace) {
+      debugPrint("Detection prediction failed: $e");
+      
       CrashLogger().logDetectionError(
         error: e.toString(),
         operation: 'predict',
         stackTrace: stackTrace,
         confidence: confidence,
       );
+      
       return null;
     } finally {
-      isProcessing.value = false;
+      _busy = false;
     }
   }
 
-  Future<String?> _getModelPath() async {
+  // ==================================================
+  // RESET
+  // ==================================================
+  void reset() {
+    _busy = false;
+  }
+
+  // ==================================================
+  // MODEL FILE HANDLING
+  // ==================================================
+  Future<String?> _getModelFile() async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/${AppConstants.yoloModelName}.tflite");
 
     if (await file.exists()) return file.path;
 
-    // Try to load from assets first (Production standard)
-    final assetPath = await _loadFromAssets(file);
-    if (assetPath != null) return assetPath;
+    final downloaded = await _downloadModel(file);
+    if (downloaded != null) return downloaded;
 
-    // Fallback to download if specified
-    return await _downloadModel(file);
-  }
-
-  Future<String?> _loadFromAssets(File target) async {
-    try {
-      LoggerService.i('Loading model from assets...');
-      final data = await rootBundle.load("assets/models/${AppConstants.yoloModelName}.tflite");
-      await target.writeAsBytes(data.buffer.asUint8List(), flush: true);
-      return target.path;
-    } catch (e) {
-      LoggerService.w('Model not found in assets, trying download...');
-      return null;
-    }
+    return _loadFromAssets(file);
   }
 
   Future<String?> _downloadModel(File target) async {
-    final url = Uri.parse("${AppConstants.yoloDownloadBase}/${AppConstants.yoloModelName}.tflite");
+    final url = Uri.parse(
+      "${AppConstants.yoloDownloadBase}/${AppConstants.yoloModelName}.tflite",
+    );
 
     try {
-      final res = await http.Client().send(http.Request("GET", url));
+      final res = await http.Client().send(
+        http.Request("GET", url),
+      );
+
       if (res.statusCode != 200) return null;
 
       final bytes = <int>[];
       int read = 0;
       final total = res.contentLength ?? 0;
 
-      await for (final chunk in res.stream) {
-        bytes.addAll(chunk);
-        read += chunk.length;
+      await for (final c in res.stream) {
+        bytes.addAll(c);
+        read += c.length;
         if (total > 0) {
           downloadProgress.value = read / total;
         }
@@ -137,13 +155,32 @@ class YoloService extends GetxService {
 
       await target.writeAsBytes(bytes, flush: true);
       return target.path;
-    } catch (e) {
-      LoggerService.e('Model download failed', e);
+    } catch (_) {
       return null;
     }
   }
 
-  void reset() {
-    isProcessing.value = false;
+  Future<String?> _loadFromAssets(File target) async {
+    try {
+      final data = await rootBundle.load(
+        "assets/models/${AppConstants.yoloModelName}.tflite",
+      );
+
+      await target.writeAsBytes(
+        data.buffer.asUint8List(),
+        flush: true,
+      );
+      return target.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ==================================================
+  // STATUS
+  // ==================================================
+  void _status(String msg) {
+    debugPrint("Detection: $msg");
+    status.value = msg;
   }
 }
