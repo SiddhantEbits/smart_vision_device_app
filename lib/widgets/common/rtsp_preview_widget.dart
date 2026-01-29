@@ -15,6 +15,9 @@ class RTSPPreviewWidget extends StatefulWidget {
   final BoxFit fit;
   final bool autoStart;
 
+  // Static list to track all active instances
+  static final List<RTSPPreviewWidgetState> _activeInstances = [];
+
   const RTSPPreviewWidget({
     super.key,
     required this.rtspUrl,
@@ -29,11 +32,43 @@ class RTSPPreviewWidget extends StatefulWidget {
     this.autoStart = true,
   });
 
+  // Static method to kill all RTSP streams
+  static Future<void> killAllStreams() async {
+    debugPrint('[RTSP] Killing all active streams...');
+    
+    // Copy list to avoid modification during iteration
+    final instances = List.from(_activeInstances);
+    
+    for (final instance in instances) {
+      if (instance.mounted && !instance._isDisposed) {
+        await instance._stopStream();
+      }
+    }
+    
+    debugPrint('[RTSP] All streams killed');
+  }
+
+  // Static method to reinitialize all streams
+  static Future<void> reinitializeAllStreams() async {
+    debugPrint('[RTSP] Reinitializing all streams...');
+    
+    // Copy list to avoid modification during iteration
+    final instances = List.from(_activeInstances);
+    
+    for (final instance in instances) {
+      if (instance.mounted && !instance._isDisposed) {
+        await instance.resetAllStreams();
+      }
+    }
+    
+    debugPrint('[RTSP] All streams reinitialized');
+  }
+
   @override
-  State<RTSPPreviewWidget> createState() => _RTSPPreviewWidgetState();
+  State<RTSPPreviewWidget> createState() => RTSPPreviewWidgetState();
 }
 
-class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindingObserver {
+class RTSPPreviewWidgetState extends State<RTSPPreviewWidget> {
   Player? player;
   VideoController? videoController;
   bool isPlayerInitialized = false;
@@ -45,7 +80,10 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindi
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    
+    // Add to active instances list
+    RTSPPreviewWidget._activeInstances.add(this);
+    
     if (widget.autoStart) {
       _initializePlayer();
     }
@@ -53,35 +91,31 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindi
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _disposePlayer();
+    // Remove from active instances list
+    RTSPPreviewWidget._activeInstances.remove(this);
+    
+    // Dispose player synchronously for dispose method
+    _isDisposed = true;
+    _isStreamActive = false;
+    
+    // Stop stream before disposing
+    if (player != null) {
+      try {
+        player!.stop();
+      } catch (e) {
+        print('Error stopping stream during disposal: $e');
+      }
+    }
+    
+    // Dispose player
+    player?.dispose();
+    player = null;
+    videoController = null;
+    
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    switch (state) {
-      case AppLifecycleState.resumed:
-        // App is in foreground, start stream if autoStart is enabled
-        if (widget.autoStart && !_isStreamActive) {
-          _startStream();
-        }
-        break;
-      case AppLifecycleState.paused:
-        // App is in background, stop stream to save resources
-        _stopStream();
-        break;
-      case AppLifecycleState.detached:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.hidden:
-        // Stop stream when app is not visible
-        _stopStream();
-        break;
-    }
-  }
-
-  // Public methods for lifecycle control
+  // Public methods for external control
   void startStream() {
     if (!_isStreamActive && !_isDisposed) {
       _startStream();
@@ -91,6 +125,61 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindi
   void stopStream() {
     if (_isStreamActive && !_isDisposed) {
       _stopStream();
+    }
+  }
+
+  // Reset all RTSP streams and reinitialize MediaKit
+  Future<void> resetAllStreams() async {
+    if (_isDisposed) return;
+    
+    // Kill all streams globally
+    await RTSPPreviewWidget.killAllStreams();
+    
+    // Wait a moment for cleanup
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    // Reinitialize all streams globally
+    await RTSPPreviewWidget.reinitializeAllStreams();
+  }
+
+  // Force complete reset of this specific widget
+  Future<void> forceReset() async {
+    if (_isDisposed) return;
+    
+    debugPrint('[RTSP] Force resetting widget...');
+    
+    // Stop current stream
+    await _stopStream();
+    
+    // Dispose current player completely (synchronous)
+    _isDisposed = true;
+    _isStreamActive = false;
+    
+    if (player != null) {
+      try {
+        await player!.stop();
+      } catch (e) {
+        print('Error stopping stream during force reset: $e');
+      }
+      player?.dispose();
+      player = null;
+      videoController = null;
+    }
+    
+    // Wait for cleanup
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Reinitialize if not disposed
+    if (!_isDisposed && mounted) {
+      setState(() {
+        hasError = false;
+        errorMessage = '';
+        isPlayerInitialized = false;
+        _isDisposed = false; // Reset disposal flag for reinitialization
+      });
+      
+      await _initializePlayer();
+      debugPrint('[RTSP] Force reset complete');
     }
   }
 
@@ -152,25 +241,6 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindi
         print('Error stopping stream: $e');
       }
     }
-  }
-
-  void _disposePlayer() {
-    _isDisposed = true;
-    _isStreamActive = false;
-    
-    // Stop stream before disposing
-    if (player != null) {
-      try {
-        player!.stop();
-      } catch (e) {
-        print('Error stopping stream during disposal: $e');
-      }
-    }
-    
-    // Dispose player
-    player?.dispose();
-    player = null;
-    videoController = null;
   }
 
   @override
@@ -236,23 +306,51 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindi
       );
     }
 
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: widget.backgroundColor,
-        borderRadius: widget.borderRadius,
-        border: widget.border,
-      ),
-      child: ClipRRect(
-        borderRadius: widget.borderRadius ?? BorderRadius.zero,
-        child: Video(
-          controller: videoController!,
-          controls: widget.showControls ? NoVideoControls : null,
-          fit: widget.fit,
-          wakelock: false,
+    return Stack(
+      children: [
+        Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: widget.backgroundColor,
+            borderRadius: widget.borderRadius,
+            border: widget.border,
+          ),
+          child: ClipRRect(
+            borderRadius: widget.borderRadius ?? BorderRadius.zero,
+            child: Video(
+              controller: videoController!,
+              controls: widget.showControls ? NoVideoControls : null,
+              fit: widget.fit,
+              wakelock: false,
+            ),
+          ),
         ),
-      ),
+        // Reset button overlay
+        Positioned(
+          top: 8,
+          right: 8,
+          child: GestureDetector(
+            onTap: resetAllStreams,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.refresh,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

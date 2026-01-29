@@ -20,7 +20,7 @@ class DetectionTestingScreen extends StatefulWidget {
   State<DetectionTestingScreen> createState() => _DetectionTestingScreenState();
 }
 
-class _DetectionTestingScreenState extends State<DetectionTestingScreen> with WidgetsBindingObserver {
+class _DetectionTestingScreenState extends State<DetectionTestingScreen> {
   late DetectionType detectionType;
   late AlertConfig config;
   late Function(bool) onTestComplete;
@@ -45,7 +45,6 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> with Wi
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     
     final arguments = Get.arguments as Map<String, dynamic>;
     detectionType = arguments['detectionType'] as DetectionType;
@@ -53,52 +52,19 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> with Wi
     onTestComplete = arguments['onTestComplete'] as Function(bool);
     onReconfigure = arguments['onReconfigure'] as Function();
     
-    // Start RTSP stream when screen initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _startRTSPStream();
-      }
-    });
+    // Initialize monitoring controller if not already done
+    if (monitoringController == null) {
+      monitoringController = Get.put(MonitoringController());
+    }
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     alertTimer?.cancel();
     if (isTestRunning && monitoringController != null) {
       monitoringController!.stopMonitoring();
     }
-    // Stop RTSP stream when disposing
-    _stopRTSPStream();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    switch (state) {
-      case AppLifecycleState.resumed:
-        // App is in foreground, start RTSP stream
-        _startRTSPStream();
-        break;
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.hidden:
-        // App is in background, stop RTSP stream to save resources
-        _stopRTSPStream();
-        break;
-    }
-  }
-
-  void _startRTSPStream() {
-    // Find and start RTSP preview widget if it exists
-    // This will be handled by the RTSPPreviewWidget's autoStart property
-  }
-
-  void _stopRTSPStream() {
-    // Stop RTSP preview widget if it exists
-    // This will be handled by the RTSPPreviewWidget's lifecycle
   }
 
   Future<void> _startTest() async {
@@ -337,15 +303,7 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> with Wi
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: true,
-      onPopInvoked: (didPop) {
-        if (didPop) {
-          _stopTest();
-          _stopRTSPStream();
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: Row(
         children: [
@@ -706,15 +664,18 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> with Wi
                     // Detection Overlay
                     if (monitoringController != null)
                       Positioned.fill(
-                        child: Obx(() {
-                          final detections = monitoringController!.currentDetections;
-                          final restrictedIds = monitoringController!.restrictedIds;
-                          
-                          return DetectionOverlay(
-                            detections: detections,
-                            restrictedIds: restrictedIds,
-                          );
-                        }),
+                        child: GetBuilder<MonitoringController>(
+                          init: monitoringController,
+                          builder: (controller) {
+                            final detections = controller.currentDetections;
+                            final restrictedIds = controller.restrictedIds;
+                            
+                            return DetectionOverlay(
+                              detections: detections,
+                              restrictedIds: restrictedIds,
+                            );
+                          },
+                        ),
                       ),
                     
                     // Detection count indicator
@@ -784,7 +745,6 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> with Wi
             ),
           ),
         ],
-      ),
       ),
     );
   }

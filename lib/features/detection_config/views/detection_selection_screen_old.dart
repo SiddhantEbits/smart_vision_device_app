@@ -3,15 +3,59 @@ import 'package:get/get.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_routes.dart';
-import '../controllers/detection_selection_controller.dart';
-import '../models/detection_item.dart';
+import '../../alert_config/controller/alert_flow_controller.dart';
+import '../../../data/models/alert_config_model.dart' as model;
 
-class DetectionSelectionScreen extends StatelessWidget {
+class DetectionSelectionScreen extends StatefulWidget {
   const DetectionSelectionScreen({super.key});
 
   @override
+  State<DetectionSelectionScreen> createState() => _DetectionSelectionScreenState();
+}
+
+class _DetectionSelectionScreenState extends State<DetectionSelectionScreen> {
+  final List<DetectionItem> detections = [
+    DetectionItem(
+      type: model.DetectionType.crowdDetection,
+      title: 'Crowd Detection',
+      description: 'Alert when person count exceeds threshold.',
+      icon: Icons.groups_rounded,
+    ),
+    DetectionItem(
+      type: model.DetectionType.absentAlert,
+      title: 'Absent Alert',
+      description: 'Alert when no one is present for a duration.',
+      icon: Icons.person_off_rounded,
+    ),
+    DetectionItem(
+      type: model.DetectionType.footfallDetection,
+      title: 'Footfall Detection',
+      description: 'Count people crossing a specific line.',
+      icon: Icons.directions_walk_rounded,
+    ),
+    DetectionItem(
+      type: model.DetectionType.restrictedArea,
+      title: 'Restricted Area',
+      description: 'Alert if someone enters a forbidden zone.',
+      icon: Icons.block_flipped,
+    ),
+    DetectionItem(
+      type: model.DetectionType.sensitiveAlert,
+      title: 'Sensitive Alert',
+      description: 'Immediate alert on any person detection.',
+      icon: Icons.security_rounded,
+    ),
+  ];
+
+  final Set<model.DetectionType> selected = {};
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.find<DetectionSelectionController>();
+    if (!Get.isRegistered<AlertFlowController>()) {
+      Get.put(AlertFlowController());
+    }
+    
+    final flowController = Get.find<AlertFlowController>();
 
     return Scaffold(
       body: Row(
@@ -39,18 +83,15 @@ class DetectionSelectionScreen extends StatelessWidget {
                 SizedBox(height: 32.adaptSize),
                 SizedBox(
                   width: double.infinity,
-                  child: Obx(() => ElevatedButton(
-                    onPressed: controller.selectedDetections.isEmpty 
+                  child: ElevatedButton(
+                    onPressed: selected.isEmpty 
                         ? null 
-                        : controller.proceedToConfiguration,
+                        : () {
+                          flowController.selectDetections(selected.toList());
+                          Get.toNamed(AppRoutes.alertConfigQueue);
+                        },
                     child: const Text('CONFIGURE ALERTS'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: controller.selectedDetections.isEmpty 
-                          ? AppTheme.mutedTextColor 
-                          : AppTheme.primaryColor,
-                      padding: EdgeInsets.symmetric(vertical: 16.adaptSize),
-                    ),
-                  )),
+                  ),
                 ),
               ],
             ),
@@ -78,13 +119,21 @@ class DetectionSelectionScreen extends StatelessWidget {
                     mainAxisSpacing: 24.adaptSize,
                     childAspectRatio: 1.4,
                   ),
-                  itemCount: controller.detections.length,
+                  itemCount: detections.length,
                   itemBuilder: (context, index) {
-                    final item = controller.detections[index];
-                    final isSelected = controller.isSelected(item.type);
+                    final item = detections[index];
+                    final isSelected = selected.contains(item.type);
                     
                     return GestureDetector(
-                      onTap: () => controller.toggleDetection(item.type),
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            selected.remove(item.type);
+                          } else {
+                            selected.add(item.type);
+                          }
+                        });
+                      },
                       child: Container(
                         padding: EdgeInsets.all(16.adaptSize),
                         decoration: BoxDecoration(
@@ -134,4 +183,18 @@ class DetectionSelectionScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class DetectionItem {
+  final model.DetectionType type;
+  final String title;
+  final String description;
+  final IconData icon;
+
+  DetectionItem({
+    required this.type,
+    required this.title,
+    required this.description,
+    required this.icon,
+  });
 }

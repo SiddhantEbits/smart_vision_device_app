@@ -141,7 +141,7 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
                               width: 12.adaptSize,
                               height: 12.adaptSize,
                               decoration: BoxDecoration(
-                                color: Colors.green,
+                                color: detectionType == DetectionType.restrictedArea ? Colors.red : Colors.green,
                               ),
                             ),
                             SizedBox(width: 12.adaptSize),

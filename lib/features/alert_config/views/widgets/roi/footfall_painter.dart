@@ -24,12 +24,15 @@ class FootfallPainter extends CustomPainter {
       config.roi.bottom * size.height,
     );
 
+    // Use red for restricted area, green for footfall
+    final roiColor = config.isRestrictedArea ? Colors.red : Colors.green;
+    
     final roiPaint = Paint()
-      ..color = Colors.green.withOpacity(0.25)
+      ..color = roiColor.withOpacity(0.25)
       ..style = PaintingStyle.fill;
 
     final roiBorder = Paint()
-      ..color = Colors.green
+      ..color = roiColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 

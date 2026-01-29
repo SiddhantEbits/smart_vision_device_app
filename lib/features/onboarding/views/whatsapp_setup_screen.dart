@@ -4,79 +4,15 @@ import 'package:get/get.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_routes.dart';
+import '../controllers/whatsapp_setup_controller.dart';
 
-class WhatsAppSetupScreen extends StatefulWidget {
+class WhatsAppSetupScreen extends StatelessWidget {
   const WhatsAppSetupScreen({super.key});
 
   @override
-  State<WhatsAppSetupScreen> createState() => _WhatsAppSetupScreenState();
-}
-
-class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _isValidNumber = false;
-
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    super.dispose();
-  }
-
-  String? _validatePhoneNumber(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a phone number';
-    }
-    
-    // Remove all non-digit characters for validation
-    final digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
-    
-    if (digitsOnly.length < 10) {
-      return 'Please enter a valid phone number (at least 10 digits)';
-    }
-    
-    if (digitsOnly.length > 15) {
-      return 'Phone number is too long';
-    }
-    
-    return null;
-  }
-
-  void _formatPhoneNumber(String value) {
-    // Simple phone number formatting
-    String formatted = value.replaceAll(RegExp(r'[^\d]'), '');
-    
-    if (formatted.startsWith('91') && formatted.length > 10) {
-      // Indian number format: +91 XXXXX XXXXX
-      formatted = '+91 ${formatted.substring(2, 7)} ${formatted.substring(7)}';
-    } else if (formatted.length >= 10) {
-      // General format: +1 XXX XXX XXXX
-      final countryCode = formatted.substring(0, 1);
-      final firstPart = formatted.substring(1, 4);
-      final secondPart = formatted.substring(4, 7);
-      final thirdPart = formatted.substring(7, 11);
-      formatted = '+$countryCode $firstPart $secondPart $thirdPart';
-    } else {
-      formatted = '+$formatted';
-    }
-    
-    _phoneController.value = TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-
-  void _onPhoneChanged(String value) {
-    final isValid = _validatePhoneNumber(value) == null;
-    if (isValid != _isValidNumber) {
-      setState(() {
-        _isValidNumber = isValid;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.find<WhatsAppSetupController>();
+
     return Scaffold(
       body: Row(
         children: [
@@ -88,29 +24,29 @@ class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                IconButton(
-                  onPressed: () => Get.back(),
-                  icon: const Icon(Icons.arrow_back),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.05),
+                  IconButton(
+                    onPressed: controller.navigateBack,
+                    icon: const Icon(Icons.arrow_back),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.05),
+                    ),
                   ),
-                ),
-                SizedBox(height: 48.adaptSize),
-                Text(
-                  'WhatsApp\nAlerts',
-                  style: TextStyle(
-                    fontSize: 32.adaptSize,
-                    fontWeight: FontWeight.bold,
+                  SizedBox(height: 48.adaptSize),
+                  Text(
+                    'WhatsApp\nAlerts',
+                    style: TextStyle(
+                      fontSize: 32.adaptSize,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                SizedBox(height: 16.adaptSize),
-                const Text(
-                  'Receive instant notifications with detection clips on your WhatsApp.',
-                  style: TextStyle(color: AppTheme.mutedTextColor),
-                ),
-                SizedBox(height: 48.adaptSize),
-              ],
-            ),
+                  SizedBox(height: 16.adaptSize),
+                  const Text(
+                    'Receive instant notifications with detection clips on your WhatsApp.',
+                    style: TextStyle(color: AppTheme.mutedTextColor),
+                  ),
+                  SizedBox(height: 48.adaptSize),
+                ],
+              ),
             ),
           ),
           
@@ -118,7 +54,7 @@ class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
             child: SingleChildScrollView(
               padding: EdgeInsets.all(64.adaptSize),
               child: Form(
-                key: _formKey,
+                key: controller.formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -140,7 +76,7 @@ class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
                       width: 400.adaptSize,
                       decoration: AppTheme.glassDecoration,
                       child: TextFormField(
-                        controller: _phoneController,
+                        controller: controller.phoneController,
                         style: TextStyle(
                           fontSize: 20.adaptSize,
                           letterSpacing: 1.2,
@@ -169,8 +105,8 @@ class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
                           ),
                         ),
                         keyboardType: TextInputType.phone,
-                        validator: _validatePhoneNumber,
-                        onChanged: _onPhoneChanged,
+                        validator: controller.validatePhoneNumber,
+                        onChanged: controller.onPhoneChanged,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                         ],
@@ -184,24 +120,20 @@ class _WhatsAppSetupScreenState extends State<WhatsAppSetupScreen> {
                       children: [
                         SizedBox(
                           width: 200.adaptSize,
-                          child: ElevatedButton(
-                            onPressed: _isValidNumber 
-                                ? () {
-                                    if (_formKey.currentState?.validate() ?? false) {
-                                      Get.toNamed(AppRoutes.cameraSetup);
-                                    }
-                                  }
+                          child: Obx(() => ElevatedButton(
+                            onPressed: controller.isValidNumber.value 
+                                ? controller.verifyAndContinue
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _isValidNumber ? AppTheme.successColor : Colors.grey,
+                              backgroundColor: controller.isValidNumber.value ? AppTheme.successColor : Colors.grey,
                               padding: EdgeInsets.symmetric(vertical: 16.adaptSize),
                             ),
                             child: const Text('VERIFY & CONTINUE'),
-                          ),
+                          )),
                         ),
                         SizedBox(width: 24.adaptSize),
                         TextButton(
-                          onPressed: () => Get.toNamed(AppRoutes.cameraSetup),
+                          onPressed: controller.skipSetup,
                           child: const Text('SKIP FOR NOW'),
                         ),
                       ],

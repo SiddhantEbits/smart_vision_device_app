@@ -14,9 +14,12 @@ class CameraSetupScreen extends StatefulWidget {
   State<CameraSetupScreen> createState() => _CameraSetupScreenState();
 }
 
-class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindingObserver {
+class _CameraSetupScreenState extends State<CameraSetupScreen> {
   late CameraSetupController controller;
   final RxBool _urlFormatValid = false.obs;
+  
+  // Key to force RTSPPreviewWidget reinitialization
+  final GlobalKey<RTSPPreviewWidgetState> _rtspKey = GlobalKey();
   
   void _validateUrlFormat(String url) {
     if (url.isEmpty || url == 'rtsp://') {
@@ -33,41 +36,27 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindi
     return GestureDetector(
       onTap: () {
         controller.text = url;
-        _validateUrlFormat(url);
-        controller.selection = TextSelection.fromPosition(
-          TextPosition(offset: controller.text.length),
-        );
       },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.adaptSize, vertical: 8.adaptSize),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8.adaptSize),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12.adaptSize,
+          vertical: 8.adaptSize,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10.adaptSize,
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 2.adaptSize),
-            Text(
-              url,
-              style: TextStyle(
-                fontSize: 9.adaptSize,
-                color: Colors.white54,
-                fontFamily: 'monospace',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8.adaptSize),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.adaptSize,
+            color: Colors.white.withOpacity(0.7),
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
@@ -76,55 +65,49 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindi
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     
     // Register controller if not already registered
     if (!Get.isRegistered<CameraSetupController>()) {
       Get.put(CameraSetupController());
     }
     controller = Get.find<CameraSetupController>();
+    
+    // Force RTSP widget reinitialization when screen becomes visible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resetAndReinitializeRTSP();
+    });
+  }
+
+  void _resetAndReinitializeRTSP() async {
+    debugPrint('[CameraSetup] Resetting RTSP stream after navigation...');
+    if (mounted && controller.isStreamValid.value) {
+      // Reset controller state to ensure clean start
+      controller.isStreamValid.value = true;
+      
+      // Force reset the RTSP widget directly
+      if (_rtspKey.currentState != null) {
+        debugPrint('[CameraSetup] Calling forceReset on RTSP widget');
+        _rtspKey.currentState!.forceReset();
+      } else {
+        debugPrint('[CameraSetup] RTSP widget state is null, cannot reset');
+      }
+    } else {
+      debugPrint('[CameraSetup] Not resetting - mounted: $mounted, streamValid: ${controller.isStreamValid.value}');
+    }
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     // Stop stream when disposing
     controller.stopStream();
     super.dispose();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    switch (state) {
-      case AppLifecycleState.resumed:
-        // App is in foreground, start stream if it was valid
-        if (controller.isStreamValid.value) {
-          // Stream will be auto-started by RTSPPreviewWidget
-        }
-        break;
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.hidden:
-        // App is in background, stop stream to save resources
-        controller.stopStream();
-        break;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final TextEditingController urlController = TextEditingController(text: 'rtsp://');
     
-    return PopScope(
-      canPop: true,
-      onPopInvoked: (didPop) {
-        if (didPop) {
-          controller.stopStream();
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: Row(
         children: [
@@ -597,6 +580,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindi
                     return AspectRatio(
                       aspectRatio: 16/9,
                       child: RTSPPreviewWidget(
+                        key: _rtspKey,
                         rtspUrl: controller.rtspUrl.value,
                         width: double.infinity,
                         height: double.infinity,
@@ -612,7 +596,6 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindi
             ),
           ),
         ],
-      ),
       ),
     );
   }

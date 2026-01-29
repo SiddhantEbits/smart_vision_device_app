@@ -109,11 +109,14 @@ class _FootfallCanvasState extends State<FootfallCanvas> {
 
   List<Widget> _roiHandles() {
     final roi = widget.config.roi;
+    // Use red for restricted area, green for footfall
+    final handleColor = widget.config.isRestrictedArea ? Colors.red : Colors.green;
+    
     return [
-      _handleDot(roi.topLeft, Colors.green),
-      _handleDot(roi.topRight, Colors.green),
-      _handleDot(roi.bottomLeft, Colors.green),
-      _handleDot(roi.bottomRight, Colors.green),
+      _handleDot(roi.topLeft, handleColor),
+      _handleDot(roi.topRight, handleColor),
+      _handleDot(roi.bottomLeft, handleColor),
+      _handleDot(roi.bottomRight, handleColor),
     ];
   }
 
