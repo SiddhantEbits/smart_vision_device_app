@@ -20,9 +20,9 @@ import '../../camera_setup/controller/camera_setup_controller.dart';
 
 class MonitoringController extends GetxController {
   // Services
-  final YoloService _yolo = Get.find<YoloService>();
-  final FFmpegService _ffmpeg = Get.find<FFmpegService>();
-  final AlertManager _alerts = Get.find<AlertManager>();
+  final YoloService _yolo = Get.put(YoloService());
+  final FFmpegService _ffmpeg = Get.put(FFmpegService());
+  final AlertManager _alerts = Get.put(AlertManager());
   final DetectionProcessor _processor = DetectionProcessor();
   final CameraSetupController cameraSetupController = Get.find<CameraSetupController>();
   
@@ -83,11 +83,26 @@ class MonitoringController extends GetxController {
     // Reset restricted area detector for clean start
     _restrictedDetector.reset();
 
-    // 1. Check YOLO model
+    // 1. Check AI model with retry mechanism
     if (!_yolo.isModelLoaded.value) {
-      LoggerService.e('YOLO model not loaded');
-      Get.snackbar('Error', 'YOLO model not loaded');
-      return;
+      LoggerService.w('AI model not loaded, attempting to load...');
+      
+      // Try to load the model
+      final modelLoaded = await _yolo.initModel();
+      
+      if (!modelLoaded) {
+        LoggerService.e('AI model failed to load');
+        Get.snackbar(
+          'Error', 
+          'AI model not loaded. Please restart the app.',
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      LoggerService.i('AI model loaded successfully');
     }
 
     // 2. Start MediaKit Preview (independent of FFmpeg)

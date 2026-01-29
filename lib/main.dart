@@ -16,6 +16,7 @@ import 'data/services/whatsapp_service.dart';
 import 'data/services/snapshot_manager.dart';
 import 'data/services/rtsp_snapshot_service.dart';
 import 'data/services/camera_log_service.dart';
+import 'data/repositories/local_storage_service.dart';
 import 'core/utils/cooldown_manager.dart';
 import 'features/camera_setup/controller/camera_setup_controller.dart';
 
@@ -27,6 +28,9 @@ void main() async {
   
   // Storage Initialization
   await GetStorage.init();
+  
+  // Initialize LocalStorageService before app starts
+  await LocalStorageService.instance.init();
   
   // Firebase Initialization
   try {
@@ -66,7 +70,10 @@ class SmartVisionApp extends StatelessWidget {
 class GlobalBinding extends Bindings {
   @override
   void dependencies() {
-    // Infrastructure
+    // Storage - Initialize first (synchronous)
+    Get.put(LocalStorageService.instance, permanent: true);
+    
+    // Infrastructure - Register dependencies first
     Get.put(CooldownManager(), permanent: true);
     Get.put(CameraLogService(), permanent: true);
     
@@ -78,13 +85,40 @@ class GlobalBinding extends Bindings {
     // Core AI & Messaging
     Get.put(YoloService(), permanent: true);
     Get.put(WhatsAppAlertService(), permanent: true);
+    
+    // Alert Management - Depends on all above services
     Get.put(AlertManager(), permanent: true);
     
     // Camera Management
     Get.put(CameraSetupController(), permanent: true);
     
-    // Initialize YOLO model asynchronously
-    final yoloService = Get.find<YoloService>();
-    yoloService.initModel();
+    // Initialize async services after registration
+    _initializeAsyncServices();
+  }
+  
+  Future<void> _initializeAsyncServices() async {
+    try {
+      debugPrint('🚀 Starting async services initialization...');
+      
+      // Initialize LocalStorageService asynchronously
+      debugPrint('📦 Initializing LocalStorageService...');
+      await LocalStorageService.instance.init();
+      debugPrint('✅ LocalStorageService initialized');
+      
+      // Initialize YOLO model asynchronously
+      debugPrint('🤖 Initializing YOLO model...');
+      final yoloService = Get.find<YoloService>();
+      final modelLoaded = await yoloService.initModel();
+      
+      if (modelLoaded) {
+        debugPrint('✅ YOLO model loaded successfully');
+      } else {
+        debugPrint('❌ YOLO model failed to load');
+      }
+      
+      debugPrint('🎉 Async services initialization completed');
+    } catch (e) {
+      debugPrint('❌ Error initializing async services: $e');
+    }
   }
 }

@@ -30,11 +30,17 @@ class YoloService extends GetxService {
     LoggerService.i(status.value);
 
     try {
+      debugPrint('🤖 YOLO: Starting model initialization...');
+      debugPrint('🤖 YOLO: Model name: ${AppConstants.yoloModelName}');
+      
       final path = await _getModelFile();
       if (path == null) {
         _status("Model file not found");
+        debugPrint('❌ YOLO: Model file not found');
         return false;
       }
+
+      debugPrint('✅ YOLO: Model file found at: $path');
 
       _yolo = YOLO(
         modelPath: path,
@@ -42,9 +48,17 @@ class YoloService extends GetxService {
         useGpu: AppConstants.useGpu,
       );
 
+      debugPrint('🤖 YOLO: Loading model with GPU=${AppConstants.useGpu}...');
       final ok = await _yolo!.loadModel();
-      isModelLoaded.value = ok;
-      _status(ok ? "Detection ready" : "Detection failed");
+      
+      if (ok) {
+        isModelLoaded.value = ok;
+        _status("Detection ready");
+        debugPrint('✅ YOLO: Model loaded successfully');
+      } else {
+        _status("Detection failed");
+        debugPrint('❌ YOLO: Model loading failed');
+      }
       
       if (!ok) {
         CrashLogger().logDetectionError(
@@ -55,7 +69,7 @@ class YoloService extends GetxService {
       
       return ok;
     } catch (e, stackTrace) {
-      debugPrint("Detection error: $e\n$stackTrace");
+      debugPrint("❌ YOLO: Detection error: $e\n$stackTrace");
       
       CrashLogger().logDetectionError(
         error: e.toString(),
@@ -118,15 +132,34 @@ class YoloService extends GetxService {
   // MODEL FILE HANDLING
   // ==================================================
   Future<String?> _getModelFile() async {
+    debugPrint('🤖 YOLO: Looking for model file...');
+    
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/${AppConstants.yoloModelName}.tflite");
 
-    if (await file.exists()) return file.path;
+    debugPrint('🤖 YOLO: Checking local file: ${file.path}');
 
+    if (await file.exists()) {
+      debugPrint('✅ YOLO: Local model file exists');
+      return file.path;
+    }
+
+    debugPrint('🤖 YOLO: Local file not found, trying download...');
     final downloaded = await _downloadModel(file);
-    if (downloaded != null) return downloaded;
+    if (downloaded != null) {
+      debugPrint('✅ YOLO: Model downloaded successfully');
+      return downloaded;
+    }
 
-    return _loadFromAssets(file);
+    debugPrint('🤖 YOLO: Download failed, trying assets...');
+    final assetsPath = await _loadFromAssets(file);
+    if (assetsPath != null) {
+      debugPrint('✅ YOLO: Model loaded from assets');
+      return assetsPath;
+    }
+
+    debugPrint('❌ YOLO: Could not find model file anywhere');
+    return null;
   }
 
   Future<String?> _downloadModel(File target) async {
@@ -162,6 +195,8 @@ class YoloService extends GetxService {
 
   Future<String?> _loadFromAssets(File target) async {
     try {
+      debugPrint('🤖 YOLO: Loading from assets: assets/models/${AppConstants.yoloModelName}.tflite');
+      
       final data = await rootBundle.load(
         "assets/models/${AppConstants.yoloModelName}.tflite",
       );
@@ -170,8 +205,11 @@ class YoloService extends GetxService {
         data.buffer.asUint8List(),
         flush: true,
       );
+      
+      debugPrint('✅ YOLO: Assets model written to: ${target.path}');
       return target.path;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ YOLO: Failed to load from assets: $e');
       return null;
     }
   }

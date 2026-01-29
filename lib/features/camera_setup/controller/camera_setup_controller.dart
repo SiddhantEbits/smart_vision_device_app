@@ -4,12 +4,14 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../core/logging/logger_service.dart';
 import '../../../data/models/camera_config.dart';
+import '../../../data/services/device_camera_firebase_service.dart';
 
 class CameraSetupController extends GetxController {
   late final Player player;
   late final VideoController videoController;
   
   final RxString rtspUrl = ''.obs;
+  final RxString cameraName = ''.obs;
   final RxBool isConnecting = false.obs;
   final RxBool isStreamValid = false.obs;
   final RxString statusMessage = 'Enter RTSP URL to begin'.obs;
@@ -31,6 +33,7 @@ class CameraSetupController extends GetxController {
     videoController = VideoController(player);
     
     _loadCameras();
+    _generateCameraNumber(); // Generate camera number on init
   }
 
   @override
@@ -217,12 +220,9 @@ class CameraSetupController extends GetxController {
     return cameras[currentCameraIndex.value];
   }
 
-  String get cameraName {
-    return currentCamera?.name ?? 'Unknown Camera';
-  }
-
   void resetCamera() {
     rtspUrl.value = '';
+    cameraName.value = '';
     isConnecting.value = false;
     isStreamValid.value = false;
     statusMessage.value = 'Enter RTSP URL to begin';
@@ -233,6 +233,98 @@ class CameraSetupController extends GetxController {
     player.stop();
     player.setVolume(0.0);
     
+    // Generate new camera number
+    _generateCameraNumber();
+    
     LoggerService.i('Camera setup controller reset for new camera');
+  }
+
+  // ==================================================
+  // CAMERA NUMBER GENERATION
+  // ==================================================
+  void _generateCameraNumber() {
+    final existingCameraCount = cameras.length;
+    final cameraNumber = (existingCameraCount + 1).toString().padLeft(2, '0');
+    cameraName.value = 'CAM$cameraNumber';
+    LoggerService.i('Generated camera number: ${cameraName.value}');
+  }
+
+  // ==================================================
+  // FIREBASE INTEGRATION
+  // ==================================================
+  Future<void> saveCameraToFirebase() async {
+    if (!isStreamValid.value || cameraName.value.isEmpty || rtspUrl.value.isEmpty) {
+      LoggerService.w('Cannot save camera: missing required fields or invalid stream');
+      return;
+    }
+
+    try {
+      // Initialize Firebase service if needed
+      await DeviceCameraFirebaseService.instance.initialize();
+      await DeviceCameraFirebaseService.instance.ensureDeviceExists();
+      
+      // Create camera config with current settings
+      final cameraConfig = CameraConfig(
+        name: cameraName.value,
+        url: rtspUrl.value,
+        confidenceThreshold: 0.15,
+        peopleCountEnabled: true,
+        maxPeople: 5,
+      );
+
+      // Save to Firebase using DeviceCameraFirebaseService
+      await DeviceCameraFirebaseService.instance.saveCamera(cameraConfig);
+      
+      // Add to local cameras list
+      addCamera(cameraConfig);
+      
+      LoggerService.i('Camera ${cameraName.value} saved to Firebase successfully');
+      statusMessage.value = 'Camera saved to Firebase successfully!';
+    } catch (e) {
+      LoggerService.e('Failed to save camera to Firebase: $e');
+      statusMessage.value = 'Failed to save camera: $e';
+    }
+  }
+
+  Future<void> updateCameraInFirebase() async {
+    if (cameraName.value.isEmpty) {
+      LoggerService.w('Cannot update camera: missing camera name');
+      return;
+    }
+
+    try {
+      // Initialize Firebase service if needed
+      await DeviceCameraFirebaseService.instance.initialize();
+      
+      // Find existing camera config
+      final existingCamera = cameras.firstWhereOrNull(
+        (cam) => cam.name == cameraName.value,
+      );
+
+      if (existingCamera != null) {
+        // Update with new RTSP URL
+        final updatedCamera = existingCamera.copyWith(
+          url: rtspUrl.value,
+        );
+
+        // Save to Firebase
+        await DeviceCameraFirebaseService.instance.updateCamera(updatedCamera);
+        
+        // Update local cameras list
+        final index = cameras.indexWhere((cam) => cam.name == cameraName.value);
+        if (index != -1) {
+          updateCamera(index, updatedCamera);
+        }
+        
+        LoggerService.i('Camera ${cameraName.value} updated in Firebase successfully');
+        statusMessage.value = 'Camera updated in Firebase successfully!';
+      } else {
+        // If not found, save as new camera
+        await saveCameraToFirebase();
+      }
+    } catch (e) {
+      LoggerService.e('Failed to update camera in Firebase: $e');
+      statusMessage.value = 'Failed to update camera: $e';
+    }
   }
 }

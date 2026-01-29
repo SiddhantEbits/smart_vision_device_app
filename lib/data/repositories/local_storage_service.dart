@@ -24,6 +24,7 @@ class LocalStorageService {
   static const String _lastSyncTimeKey = 'last_sync_time';
   static const String _pendingChangesKey = 'pending_changes';
   static const String _syncMetadataKey = 'sync_metadata';
+  static const String _whatsappConfigKey = 'whatsapp_config';
 
   // Public getter for storage access
   GetStorage get storage => _storage;
@@ -58,6 +59,13 @@ class LocalStorageService {
         'lastSyncTime': null,
         'syncVersion': 1,
         'deviceId': deviceId,
+      });
+    }
+    
+    if (!_storage.hasData(_whatsappConfigKey)) {
+      _storage.write(_whatsappConfigKey, {
+        'alertEnable': false,
+        'phoneNumbers': <String>[],
       });
     }
   }
@@ -219,13 +227,32 @@ class LocalStorageService {
   /// ===========================================================
   
   Map<String, String> get pendingChanges {
-    return _storage.read(_pendingChangesKey) as Map<String, String>? ?? {};
+    try {
+      final pending = _storage.read(_pendingChangesKey);
+      
+      if (pending is Map<String, String>) {
+        return pending;
+      } else if (pending is Map) {
+        // Convert to Map<String, String> if needed
+        return Map<String, String>.from(pending.cast<String, dynamic>());
+      } else {
+        return {};
+      }
+    } catch (e) {
+      print('Error getting pending changes: $e');
+      return {};
+    }
   }
 
   Future<void> _markPendingChange(String key, String operation) async {
-    final pending = pendingChanges;
-    pending[key] = operation;
-    await _storage.write(_pendingChangesKey, pending);
+    try {
+      final pending = pendingChanges;
+      pending[key] = operation;
+      await _storage.write(_pendingChangesKey, pending);
+    } catch (e) {
+      print('Error in _markPendingChange: $e');
+      rethrow;
+    }
   }
 
   Future<void> clearPendingChange(String key) async {
@@ -333,6 +360,152 @@ class LocalStorageService {
       return true;
     } catch (e) {
       print('Error importing data: $e');
+      return false;
+    }
+  }
+
+  /// ===========================================================
+  /// WHATSAPP CONFIG MANAGEMENT
+  /// ===========================================================
+  
+  /// Get WhatsApp configuration from local storage
+  Map<String, dynamic> getWhatsAppConfig() {
+    try {
+      final config = _storage.read(_whatsappConfigKey);
+      
+      if (config is Map<String, dynamic>) {
+        return config;
+      } else if (config is Map) {
+        // Convert to Map<String, dynamic> if needed
+        return Map<String, dynamic>.from(config);
+      } else {
+        return {
+          'alertEnable': false,
+          'phoneNumbers': <String>[],
+        };
+      }
+    } catch (e) {
+      print('Error getting WhatsApp config: $e');
+      return {
+        'alertEnable': false,
+        'phoneNumbers': <String>[],
+      };
+    }
+  }
+  
+  /// Save WhatsApp configuration to local storage
+  Future<void> saveWhatsAppConfig({
+    bool? alertEnable,
+    List<String>? phoneNumbers,
+  }) async {
+    try {
+      final currentConfig = getWhatsAppConfig();
+      
+      // Safely extract phone numbers list
+      List<String> currentPhoneNumbers = [];
+      if (currentConfig['phoneNumbers'] != null) {
+        if (currentConfig['phoneNumbers'] is List) {
+          currentPhoneNumbers = List<String>.from(currentConfig['phoneNumbers']);
+        }
+      }
+      
+      final updatedConfig = <String, dynamic>{
+        'alertEnable': alertEnable ?? currentConfig['alertEnable'] ?? false,
+        'phoneNumbers': phoneNumbers ?? currentPhoneNumbers,
+      };
+      
+      await _storage.write(_whatsappConfigKey, updatedConfig);
+      
+      // Mark as pending change for sync
+      await _markPendingChange('whatsapp_config', 'update');
+    } catch (e) {
+      print('Error saving WhatsApp config: $e');
+      rethrow;
+    }
+  }
+  
+  /// Add phone number to WhatsApp configuration
+  Future<void> addWhatsAppPhoneNumber(String phoneNumber) async {
+    try {
+      final config = getWhatsAppConfig();
+      
+      // Safely extract phone numbers list
+      List<String> phoneNumbers = [];
+      if (config['phoneNumbers'] != null) {
+        if (config['phoneNumbers'] is List) {
+          phoneNumbers = List<String>.from(config['phoneNumbers']);
+        }
+      }
+      
+      // Remove duplicates and add new number
+      phoneNumbers.removeWhere((number) => number == phoneNumber);
+      phoneNumbers.add(phoneNumber);
+      
+      await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
+    } catch (e) {
+      print('Error adding WhatsApp phone number: $e');
+      rethrow;
+    }
+  }
+  
+  /// Remove phone number from WhatsApp configuration
+  Future<void> removeWhatsAppPhoneNumber(String phoneNumber) async {
+    try {
+      final config = getWhatsAppConfig();
+      
+      // Safely extract phone numbers list
+      List<String> phoneNumbers = [];
+      if (config['phoneNumbers'] != null) {
+        if (config['phoneNumbers'] is List) {
+          phoneNumbers = List<String>.from(config['phoneNumbers']);
+        }
+      }
+      
+      phoneNumbers.removeWhere((number) => number == phoneNumber);
+      
+      await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
+    } catch (e) {
+      print('Error removing WhatsApp phone number: $e');
+      rethrow;
+    }
+  }
+  
+  /// Get all WhatsApp phone numbers
+  List<String> getWhatsAppPhoneNumbers() {
+    try {
+      final config = getWhatsAppConfig();
+      
+      // Safely extract phone numbers list
+      if (config['phoneNumbers'] != null) {
+        if (config['phoneNumbers'] is List) {
+          return List<String>.from(config['phoneNumbers']);
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      print('Error getting WhatsApp phone numbers: $e');
+      return [];
+    }
+  }
+  
+  /// Enable/disable WhatsApp alerts
+  Future<void> setWhatsAppAlertsEnabled(bool enabled) async {
+    try {
+      await saveWhatsAppConfig(alertEnable: enabled);
+    } catch (e) {
+      print('Error setting WhatsApp alerts enabled: $e');
+      rethrow;
+    }
+  }
+  
+  /// Check if WhatsApp alerts are enabled
+  bool getWhatsAppAlertsEnabled() {
+    try {
+      final config = getWhatsAppConfig();
+      return config['alertEnable'] ?? false;
+    } catch (e) {
+      print('Error getting WhatsApp alerts enabled: $e');
       return false;
     }
   }

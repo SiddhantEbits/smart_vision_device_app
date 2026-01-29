@@ -213,7 +213,7 @@ class _CameraStreamScreenState extends State<CameraStreamScreen> {
                               ),
                               SizedBox(width: 12.adaptSize),
                               Text(
-                                controller.modelLoaded.value ? 'YOLO Model Ready' : 'Loading YOLO Model...',
+                                controller.modelLoaded.value ? 'AI Model Ready' : 'Loading AI Model...',
                                 style: TextStyle(
                                   fontSize: 13.adaptSize,
                                   color: Colors.white,

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/constants/app_routes.dart';
 import '../controllers/whatsapp_setup_controller.dart';
 
 class WhatsAppSetupScreen extends StatelessWidget {

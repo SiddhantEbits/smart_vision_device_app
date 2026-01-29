@@ -3,6 +3,7 @@ import 'package:dio/dio.dart' as dio;
 import 'package:get/get.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/logging/logger_service.dart';
+import '../repositories/local_storage_service.dart';
 
 class WhatsAppAlertService extends GetxService {
   final dio.Dio _dio = dio.Dio();
@@ -25,12 +26,23 @@ class WhatsAppAlertService extends GetxService {
     int? hours,
     int? detectionCount,
   }) async {
-    // In a real app, these would come from the setup flow's WhatsApp state
-    const phoneNumbers = "919999999999"; 
+    // Get phone numbers from local storage
+    final phoneNumbers = LocalStorageService.instance.getWhatsAppPhoneNumbers();
+    
+    // Check if WhatsApp alerts are enabled and phone numbers exist
+    final isWhatsAppEnabled = LocalStorageService.instance.getWhatsAppAlertsEnabled();
+    
+    if (!isWhatsAppEnabled || phoneNumbers.isEmpty) {
+      LoggerService.w('⚠️ WhatsApp alerts disabled or no phone numbers configured');
+      return;
+    }
 
     try {
+      // Convert phone numbers list to comma-separated string
+      final phoneNumbersString = phoneNumbers.join(',');
+      
       final Map<String, dynamic> data = {
-        "phoneNumbers": phoneNumbers,
+        "phoneNumbers": phoneNumbersString,
         "phoneNumberId": AppConstants.phoneNumberId,
         "alertType": alertType,
         "cameraNo": cameraNo,
@@ -64,7 +76,7 @@ class WhatsAppAlertService extends GetxService {
 
       final formData = dio.FormData.fromMap(data);
       
-      LoggerService.i('Sending WhatsApp Alert [$alertType] via API...');
+      LoggerService.i('Sending WhatsApp Alert [$alertType] to $phoneNumbersString via API...');
       
       final response = await _dio.post(
         "/api/uploadMedia", // Endpoint from reference project
@@ -72,7 +84,7 @@ class WhatsAppAlertService extends GetxService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        LoggerService.i('✅ WhatsApp Alert sent successfully');
+        LoggerService.i('✅ WhatsApp Alert sent successfully to $phoneNumbersString');
       } else {
         LoggerService.w('⚠️ WhatsApp API returned non-200: ${response.statusCode}');
       }

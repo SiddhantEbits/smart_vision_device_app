@@ -89,14 +89,27 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> {
         return;
       }
 
-      // Check YOLO model availability first
+      // Check AI model availability first
       final yoloService = Get.find<YoloService>();
       if (!yoloService.isModelLoaded.value) {
         setState(() {
-          isTestRunning = false;
-          testMessage = '❌ YOLO model not loaded';
+          testMessage = '🔄 Loading AI model...';
         });
-        return;
+        
+        // Try to load the model
+        final modelLoaded = await yoloService.initModel();
+        
+        if (!modelLoaded) {
+          setState(() {
+            isTestRunning = false;
+            testMessage = '❌ AI model failed to load. Please restart the app.';
+          });
+          return;
+        }
+        
+        setState(() {
+          testMessage = '✅ AI model loaded successfully';
+        });
       }
 
       // Initialize monitoring controller if not already done

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../data/repositories/local_storage_service.dart';
 
 class WhatsAppSetupController extends GetxController {
   final TextEditingController phoneController = TextEditingController();
@@ -68,9 +69,32 @@ class WhatsAppSetupController extends GetxController {
     }
   }
 
-  void verifyAndContinue() {
+  Future<void> verifyAndContinue() async {
     if (formKey.currentState?.validate() ?? false) {
-      Get.toNamed(AppRoutes.cameraSetup);
+      try {
+        // Get the formatted phone number
+        final phoneNumber = phoneController.text.trim();
+        
+        // Save phone number to local storage
+        await LocalStorageService.instance.addWhatsAppPhoneNumber(phoneNumber);
+        
+        // Enable WhatsApp alerts
+        await LocalStorageService.instance.setWhatsAppAlertsEnabled(true);
+        
+        debugPrint('✅ WhatsApp phone number saved: $phoneNumber');
+        debugPrint('✅ WhatsApp alerts enabled');
+        
+        // Navigate to next screen
+        Get.toNamed(AppRoutes.cameraSetup);
+      } catch (e) {
+        debugPrint('❌ Error saving WhatsApp configuration: $e');
+        Get.snackbar(
+          'Error',
+          'Failed to save WhatsApp configuration. Please try again.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
     }
   }
 
