@@ -6,6 +6,7 @@ import '../../../data/models/alert_config_model.dart';
 import '../../../data/models/roi_config_model.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/logging/logger_service.dart';
 import 'widgets/roi/footfall_canvas.dart';
 import '../../../features/camera_setup/controller/camera_setup_controller.dart';
 
@@ -408,13 +409,37 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
     // Stop RTSP stream before continuing
     _stopRTSPStream();
     
-    // Collect ROI points
-    final roiPoints = [
-      roiConfig.lineStart,
-      roiConfig.lineEnd,
-    ];
+    // Collect ROI points based on detection type
+    List<Offset> roiPoints;
+    
+    if (detectionType == DetectionType.restrictedArea) {
+      // For restricted area, use rectangle corners (top-left, bottom-right)
+      roiPoints = [
+        roiConfig.roi.topLeft,
+        roiConfig.roi.bottomRight,
+      ];
+    } else {
+      // For footfall, use line points
+      roiPoints = [
+        roiConfig.lineStart,
+        roiConfig.lineEnd,
+      ];
+    }
     
     final roiType = detectionType == DetectionType.footfallDetection ? 'line' : 'box';
+    
+    // Debug logging
+    LoggerService.i('ROI Setup - Detection Type: $detectionType');
+    LoggerService.i('ROI Setup - ROI Type: $roiType');
+    if (detectionType == DetectionType.restrictedArea) {
+      LoggerService.i('ROI Setup - ROI Rectangle: ${roiConfig.roi}');
+      LoggerService.i('ROI Setup - Top Left: ${roiConfig.roi.topLeft}');
+      LoggerService.i('ROI Setup - Bottom Right: ${roiConfig.roi.bottomRight}');
+    } else {
+      LoggerService.i('ROI Setup - Line Start: ${roiConfig.lineStart}');
+      LoggerService.i('ROI Setup - Line End: ${roiConfig.lineEnd}');
+    }
+    LoggerService.i('ROI Setup - ROI Points: $roiPoints');
     
     // Call the onComplete callback with proper type casting
     onComplete(roiPoints.cast<Offset>(), roiType);

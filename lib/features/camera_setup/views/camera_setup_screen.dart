@@ -7,9 +7,15 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../widgets/common/rtsp_preview_widget.dart';
 
-class CameraSetupScreen extends GetView<CameraSetupController> {
-   CameraSetupScreen({super.key});
-  
+class CameraSetupScreen extends StatefulWidget {
+  const CameraSetupScreen({super.key});
+
+  @override
+  State<CameraSetupScreen> createState() => _CameraSetupScreenState();
+}
+
+class _CameraSetupScreenState extends State<CameraSetupScreen> with WidgetsBindingObserver {
+  late CameraSetupController controller;
   final RxBool _urlFormatValid = false.obs;
   
   void _validateUrlFormat(String url) {
@@ -68,14 +74,57 @@ class CameraSetupScreen extends GetView<CameraSetupController> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    
+    // Register controller if not already registered
     if (!Get.isRegistered<CameraSetupController>()) {
       Get.put(CameraSetupController());
     }
+    controller = Get.find<CameraSetupController>();
+  }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Stop stream when disposing
+    controller.stopStream();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App is in foreground, start stream if it was valid
+        if (controller.isStreamValid.value) {
+          // Stream will be auto-started by RTSPPreviewWidget
+        }
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // App is in background, stop stream to save resources
+        controller.stopStream();
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final TextEditingController urlController = TextEditingController(text: 'rtsp://');
-
-    return Scaffold(
+    
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          controller.stopStream();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: Row(
         children: [
@@ -554,6 +603,7 @@ class CameraSetupScreen extends GetView<CameraSetupController> {
                         borderRadius: BorderRadius.circular(16.adaptSize),
                         backgroundColor: Colors.black,
                         fit: BoxFit.contain,
+                        autoStart: true, // Auto-start when widget builds
                       ),
                     );
                   }
@@ -562,6 +612,7 @@ class CameraSetupScreen extends GetView<CameraSetupController> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -80,6 +80,9 @@ class MonitoringController extends GetxController {
 
     LoggerService.i('Starting Monitoring: $rtspUrl');
 
+    // Reset restricted area detector for clean start
+    _restrictedDetector.reset();
+
     // 1. Check YOLO model
     if (!_yolo.isModelLoaded.value) {
       LoggerService.e('YOLO model not loaded');
@@ -260,6 +263,8 @@ class MonitoringController extends GetxController {
       if (config.type == DetectionType.restrictedArea) {
         if (config.roiPoints != null && config.roiPoints!.length >= 2) {
           LoggerService.i('Processing restricted area detection with ${config.roiPoints!.length} ROI points');
+          LoggerService.i('ROI Point 0: ${config.roiPoints![0]}');
+          LoggerService.i('ROI Point 1: ${config.roiPoints![1]}');
           final roiRect = Rect.fromPoints(config.roiPoints![0], config.roiPoints![1]);
           LoggerService.i('Restricted area ROI: $roiRect');
           
@@ -267,6 +272,11 @@ class MonitoringController extends GetxController {
             detections: detections,
             restrictedRoi: roiRect,
           );
+          
+          final restrictedIds = _restrictedDetector.getRestrictedIds();
+          LoggerService.i('RestrictedAreaDetector: Total restricted IDs: ${restrictedIds.length}');
+          LoggerService.i('RestrictedAreaDetector: Restricted IDs list: $restrictedIds');
+          
           if (violations.isNotEmpty) {
             restrictedTriggered = true;
             LoggerService.i('Restricted area violations detected: ${violations.length}');

@@ -4,6 +4,7 @@ import '../controller/alert_flow_controller.dart';
 import '../../../data/models/alert_config_model.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/logging/logger_service.dart';
 
 class AlertConfigQueueScreen extends StatefulWidget {
   const AlertConfigQueueScreen({super.key});
@@ -190,8 +191,14 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
       Get.toNamed('/roi-setup', arguments: {
         'detectionType': currentType,
         'onComplete': (List<Offset> roiPoints, String roiType) {
-          // Update the last saved config with ROI data
+          // Debug logging for ROI points received
           final currentType = currentDetectionType;
+          LoggerService.i('Alert Queue - ROI Complete Callback');
+          LoggerService.i('Alert Queue - Detection Type: $currentType');
+          LoggerService.i('Alert Queue - ROI Type: $roiType');
+          LoggerService.i('Alert Queue - ROI Points: $roiPoints');
+          
+          // Update the last saved config with ROI data
           if (flowController.configs.containsKey(currentType)) {
             final lastConfig = flowController.configs[currentType]!;
             final updatedConfig = AlertConfig(
@@ -205,6 +212,7 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
               roiType: roiType,
             );
             flowController.configs[currentType] = updatedConfig;
+            LoggerService.i('Alert Queue - Updated config with ROI points');
           }
           
           // Go to testing screen

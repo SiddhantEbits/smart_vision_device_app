@@ -99,7 +99,7 @@ class MonitoringScreen extends GetView<MonitoringController> {
           SizedBox(height: 16.adaptSize),
           _buildStat('Footfall Total', controller.footfallTotal.value.toString(), Icons.directions_walk),
           SizedBox(height: 16.adaptSize),
-          _buildStat('Breaches', '0', Icons.security), // Logic for total breaches to be added
+          _buildStat('People in Restricted Area', controller.restrictedIds.length.toString(), Icons.security),
         ],
       ),
     );

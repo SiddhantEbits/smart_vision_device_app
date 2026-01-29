@@ -79,7 +79,23 @@ class RestrictedAreaDetector {
     final violations = <RestrictionViolation>[];
     final now = DateTime.now();
     
+    LoggerService.i('RestrictedAreaDetector: Processing ${detections.length} detections');
+    LoggerService.i('RestrictedAreaDetector: ROI: $restrictedRoi');
+    
     _cleanupOldViolations(now);
+    
+    // Get current detection IDs for real-time tracking
+    final currentDetectionIds = detections.map((d) => d.id).toSet();
+    
+    // Immediately remove people who are no longer detected (real-time cleanup)
+    final idsToRemove = _personInsideRestricted.keys.where((id) => !currentDetectionIds.contains(id)).toList();
+    for (final id in idsToRemove) {
+      LoggerService.i('RestrictedAreaDetector: Removing undetected person $id from restricted tracking');
+      _personInsideRestricted.remove(id);
+      _personEntryTime.remove(id);
+      _lastSeenTime.remove(id);
+      _lastViolationTime.remove(id);
+    }
     
     for (final detection in detections) {
       _lastSeenTime[detection.id] = now;
@@ -87,6 +103,8 @@ class RestrictedAreaDetector {
       // Use footPoint for immediate "touch" detection as feet enter first
       final isInside = restrictedRoi.contains(detection.footPoint);
       final wasInside = _personInsideRestricted[detection.id] ?? false;
+      
+      LoggerService.i('RestrictedAreaDetector: Person ${detection.id} - Inside: $isInside, Was Inside: $wasInside, Foot Point: ${detection.footPoint}');
 
       // Update state immediately for instant Red Box feedback
       _personInsideRestricted[detection.id] = isInside;
@@ -101,12 +119,16 @@ class RestrictedAreaDetector {
           violationArea: restrictedRoi,
           description: 'Restricted area breach detected',
         ));
+        LoggerService.i('RestrictedAreaDetector: ENTRY VIOLATION for person ${detection.id}');
       }
 
       if (!isInside) {
         _personEntryTime.remove(detection.id);
       }
     }
+    
+    final currentInside = getRestrictedIds();
+    LoggerService.i('RestrictedAreaDetector: Currently inside: ${currentInside.length} people - IDs: $currentInside');
 
     _cleanupUndetectedPersons(now);
 

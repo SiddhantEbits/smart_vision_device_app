@@ -9,17 +9,53 @@ import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/logging/logger_service.dart';
 
-class CameraStreamScreen extends GetView<CameraStreamController> {
+class CameraStreamScreen extends StatefulWidget {
   const CameraStreamScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<CameraStreamScreen> createState() => _CameraStreamScreenState();
+}
+
+class _CameraStreamScreenState extends State<CameraStreamScreen> {
+  late CameraStreamController controller;
+
+  @override
+  void initState() {
+    super.initState();
     // Register controller if not already registered
     if (!Get.isRegistered<CameraStreamController>()) {
       Get.put(CameraStreamController());
     }
+    controller = Get.find<CameraStreamController>();
+    
+    // Start camera when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        controller.startCamera();
+      }
+    });
+  }
 
-    return Scaffold(
+  @override
+  void dispose() {
+    // Stop camera when widget is disposed
+    if (Get.isRegistered<CameraStreamController>()) {
+      controller.stopCamera();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          // Stop camera stream when navigating away
+          controller.stopCamera();
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: Row(
         children: [
@@ -281,6 +317,7 @@ class CameraStreamScreen extends GetView<CameraStreamController> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

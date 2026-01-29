@@ -67,6 +67,9 @@ class _DetectionPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (detections.isEmpty) return;
+    
+    print('DetectionOverlay: Painting ${detections.length} detections');
+    print('DetectionOverlay: Restricted IDs: $restrictedIds');
 
     for (final d in detections) {
       if (onlyPersons &&
@@ -75,11 +78,13 @@ class _DetectionPainter extends CustomPainter {
       }
 
       final bool isRestricted = restrictedIds.contains(d.id);
+      
+      print('DetectionOverlay: Person ${d.id} - Restricted: $isRestricted, BBox: ${d.bbox}');
 
       // --------------------------------------------------
-      // COLORS: Red for restricted, Cyan for normal
+      // COLORS: Red for restricted, Green for normal (changed from cyan)
       // --------------------------------------------------
-      _boxPaint.color = isRestricted ? Colors.redAccent : Colors.cyanAccent;
+      _boxPaint.color = isRestricted ? Colors.red : Colors.green;
       _fillPaint.color = isRestricted
           ? Colors.red.withOpacity(0.55)
           : Colors.black.withOpacity(0.45);
@@ -93,6 +98,8 @@ class _DetectionPainter extends CustomPainter {
         d.bbox.right * size.width,
         d.bbox.bottom * size.height,
       );
+      
+      print('DetectionOverlay: Screen rect: $rect');
 
       // --------------------------------------------------
       // BOX

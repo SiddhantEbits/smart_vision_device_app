@@ -13,6 +13,7 @@ class RTSPPreviewWidget extends StatefulWidget {
   final Widget? placeholder;
   final bool showControls;
   final BoxFit fit;
+  final bool autoStart;
 
   const RTSPPreviewWidget({
     super.key,
@@ -25,32 +26,77 @@ class RTSPPreviewWidget extends StatefulWidget {
     this.placeholder,
     this.showControls = false,
     this.fit = BoxFit.contain,
+    this.autoStart = true,
   });
 
   @override
   State<RTSPPreviewWidget> createState() => _RTSPPreviewWidgetState();
 }
 
-class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> {
+class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> with WidgetsBindingObserver {
   Player? player;
   VideoController? videoController;
   bool isPlayerInitialized = false;
   bool hasError = false;
   String errorMessage = '';
+  bool _isDisposed = false;
+  bool _isStreamActive = false;
 
   @override
   void initState() {
     super.initState();
-    _initializePlayer();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.autoStart) {
+      _initializePlayer();
+    }
   }
 
   @override
   void dispose() {
-    player?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _disposePlayer();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App is in foreground, start stream if autoStart is enabled
+        if (widget.autoStart && !_isStreamActive) {
+          _startStream();
+        }
+        break;
+      case AppLifecycleState.paused:
+        // App is in background, stop stream to save resources
+        _stopStream();
+        break;
+      case AppLifecycleState.detached:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        // Stop stream when app is not visible
+        _stopStream();
+        break;
+    }
+  }
+
+  // Public methods for lifecycle control
+  void startStream() {
+    if (!_isStreamActive && !_isDisposed) {
+      _startStream();
+    }
+  }
+
+  void stopStream() {
+    if (_isStreamActive && !_isDisposed) {
+      _stopStream();
+    }
+  }
+
   Future<void> _initializePlayer() async {
+    if (_isDisposed) return;
+    
     try {
       player = Player();
       videoController = VideoController(player!);
@@ -63,17 +109,68 @@ class _RTSPPreviewWidgetState extends State<RTSPPreviewWidget> {
       });
       
       // Start playing RTSP stream
+      await _startStream();
+      
+    } catch (e) {
+      if (!_isDisposed) {
+        setState(() {
+          hasError = true;
+          errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _startStream() async {
+    if (player == null || _isDisposed || _isStreamActive) return;
+    
+    try {
       await player!.open(
         Media(widget.rtspUrl),
         play: true,
       );
-      
+      _isStreamActive = true;
     } catch (e) {
-      setState(() {
-        hasError = true;
-        errorMessage = e.toString();
-      });
+      if (!_isDisposed) {
+        setState(() {
+          hasError = true;
+          errorMessage = e.toString();
+        });
+      }
     }
+  }
+
+  Future<void> _stopStream() async {
+    if (player == null || !_isStreamActive || _isDisposed) return;
+    
+    try {
+      await player!.stop();
+      _isStreamActive = false;
+    } catch (e) {
+      // Log error but don't update state if disposed
+      if (!_isDisposed) {
+        print('Error stopping stream: $e');
+      }
+    }
+  }
+
+  void _disposePlayer() {
+    _isDisposed = true;
+    _isStreamActive = false;
+    
+    // Stop stream before disposing
+    if (player != null) {
+      try {
+        player!.stop();
+      } catch (e) {
+        print('Error stopping stream during disposal: $e');
+      }
+    }
+    
+    // Dispose player
+    player?.dispose();
+    player = null;
+    videoController = null;
   }
 
   @override
