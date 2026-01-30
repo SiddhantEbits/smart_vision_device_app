@@ -41,6 +41,9 @@ class MonitoringController extends GetxController {
   final RxInt footfallTotal = 0.obs;
   final RxBool isStreaming = false.obs;
   
+  // Current frame for snapshots
+  Uint8List? _currentFrame;
+  
   // Configuration
   List<AlertConfig> _configs = [];
   String _rtspUrl = '';
@@ -49,6 +52,11 @@ class MonitoringController extends GetxController {
   void setConfigs(List<AlertConfig> configs) {
     _configs = configs;
     LoggerService.i('Set ${configs.length} alert configurations for monitoring');
+  }
+
+  /// Get current frame for snapshot (returns null if no frame available)
+  Uint8List? getCurrentFrame() {
+    return _currentFrame;
   }
 
   @override
@@ -206,6 +214,9 @@ class MonitoringController extends GetxController {
 
   void _onFrameReceived(Uint8List bytes) async {
     if (!isStreaming.value) return;
+
+    // Store current frame for snapshots
+    _currentFrame = bytes;
 
     final now = DateTime.now();
     

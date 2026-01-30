@@ -31,13 +31,33 @@ class QRScanController extends GetxController {
       print('🔄 Loading device info...');
       isLoading.value = true;
       
-      // Check if device ID already exists
-      final hasId = await DeviceIdManager.hasDeviceId();
-      print('📱 Device ID exists: $hasId');
+      // First check if device ID already exists in local storage
+      final existingDeviceId = await DeviceIdManager.getExistingDeviceId();
+      print('📱 Existing device ID from local storage: $existingDeviceId');
       
-      if (!hasId) {
-        print('🆕 Generating new device ID...');
-        // Generate new device ID only if it doesn't exist
+      if (existingDeviceId != null && existingDeviceId.isNotEmpty) {
+        print('📋 Using existing device ID from local storage...');
+        // Use existing device ID from local storage
+        deviceId.value = existingDeviceId;
+        print('✅ Existing device ID: $existingDeviceId');
+        
+        // Get device name
+        print('📝 Loading device name...');
+        final name = await DeviceIdManager.getDeviceName();
+        deviceName.value = name;
+        deviceNameController.text = name;
+        print('✅ Device name loaded: $name');
+        
+        // Ensure Firebase document exists (will update existing if it exists)
+        print('💾 Ensuring Firebase document exists...');
+        await _saveDeviceIdToFirebase(existingDeviceId);
+      } else {
+        // No local device ID found - check if we should create a new one
+        print('🔍 No local device ID found, checking Firebase for any existing device...');
+        
+        // For now, generate a new device ID since we don't have any existing one
+        // In the future, you might want to implement logic to recover a device ID
+        print('🆕 No existing device ID found, generating new device ID...');
         final id = await DeviceIdManager.regenerateDeviceId();
         deviceId.value = id;
         print('✅ Device ID generated: $id');
@@ -51,23 +71,6 @@ class QRScanController extends GetxController {
         
         // Save ONLY device ID to Firebase (no device name)
         print('💾 Saving device ID to Firebase...');
-        await _saveDeviceIdToFirebase(id);
-      } else {
-        print('📋 Using existing device ID...');
-        // Use existing device ID
-        final id = await DeviceIdManager.getDeviceId();
-        deviceId.value = id;
-        print('✅ Existing device ID: $id');
-        
-        // Get device name
-        print('📝 Loading device name...');
-        final name = await DeviceIdManager.getDeviceName();
-        deviceName.value = name;
-        deviceNameController.text = name;
-        print('✅ Device name loaded: $name');
-        
-        // Ensure Firebase document exists (device ID only)
-        print('💾 Ensuring Firebase document exists...');
         await _saveDeviceIdToFirebase(id);
       }
       

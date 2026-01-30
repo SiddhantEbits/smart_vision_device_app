@@ -5,6 +5,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../../core/logging/logger_service.dart';
 import '../../../data/models/camera_config.dart';
 import '../../../data/services/device_camera_firebase_service.dart';
+import '../../../data/repositories/simple_storage_service.dart';
 
 class CameraSetupController extends GetxController {
   late final Player player;
@@ -121,41 +122,24 @@ class CameraSetupController extends GetxController {
   // ==================================================
   // CAMERA MANAGEMENT
   // ==================================================
-  void _loadCameras() {
+  Future<void> _loadCameras() async {
     try {
-      final storage = GetStorage();
-      final camerasData = storage.read(_camerasKey);
+      final simpleStorage = SimpleStorageService.instance;
+      final cameraConfigs = simpleStorage.getCameraConfigs();
       
-      if (camerasData != null && camerasData is List) {
-        cameras.value = (camerasData as List)
-            .map((json) => CameraConfig.fromJson(json as Map<String, dynamic>))
-            .toList();
-        LoggerService.i('Loaded ${cameras.length} cameras from storage');
+      if (cameraConfigs.isNotEmpty) {
+        cameras.value = cameraConfigs;
+        LoggerService.i('Loaded ${cameras.length} cameras from SimpleStorageService');
+        
+        // Log camera names for debugging
+        for (final camera in cameras) {
+          LoggerService.d('📷 Found camera: ${camera.name}');
+        }
       } else {
-        // Add default cameras for demo
-        cameras.addAll([
-          CameraConfig(
-            name: 'Entrance Lobby',
-            url: 'rtsp://192.168.1.100:554/stream',
-            confidenceThreshold: 0.15,
-            peopleCountEnabled: true,
-            maxPeople: 5,
-          ),
-          CameraConfig(
-            name: 'Office Hall',
-            url: 'rtsp://192.168.1.101:554/stream',
-            confidenceThreshold: 0.15,
-            footfallEnabled: true,
-          ),
-          CameraConfig(
-            name: 'Warehouse',
-            url: 'rtsp://192.168.1.102:554/stream',
-            confidenceThreshold: 0.15,
-            restrictedAreaEnabled: true,
-          ),
-        ]);
+        // Clear any existing cameras and start fresh - no default cameras
+        cameras.clear();
         _saveCameras();
-        LoggerService.i('Created default cameras');
+        LoggerService.i('No cameras found - starting with empty camera list');
       }
     } catch (e) {
       LoggerService.e('Error loading cameras: $e');
@@ -165,10 +149,14 @@ class CameraSetupController extends GetxController {
 
   void _saveCameras() {
     try {
-      final storage = GetStorage();
-      final camerasData = cameras.map((cam) => cam.toJson()).toList();
-      storage.write(_camerasKey, camerasData);
-      LoggerService.d('Saved ${cameras.length} cameras to storage');
+      final simpleStorage = SimpleStorageService.instance;
+      // Save each camera using SimpleStorageService
+      for (int i = 0; i < cameras.length; i++) {
+        final camera = cameras[i];
+        // Use the camera config save method from SimpleStorageService
+        simpleStorage.saveCameraConfig(camera);
+      }
+      LoggerService.d('Saved ${cameras.length} cameras to SimpleStorageService');
     } catch (e) {
       LoggerService.e('Error saving cameras: $e');
     }
@@ -200,6 +188,29 @@ class CameraSetupController extends GetxController {
       
       _saveCameras();
       LoggerService.i('Removed camera: ${removedCamera.name}');
+    }
+  }
+
+  /// Clear all cameras (for debugging/testing)
+  Future<void> clearAllCameras() async {
+    try {
+      final simpleStorage = SimpleStorageService.instance;
+      cameras.clear();
+      await simpleStorage.storage.remove('camera_configs');
+      LoggerService.i('✅ All cameras cleared from storage');
+    } catch (e) {
+      LoggerService.e('❌ Error clearing cameras: $e');
+    }
+  }
+
+  /// Ensure only one camera exists (keep the first one)
+  void ensureSingleCamera() {
+    if (cameras.length > 1) {
+      final firstCamera = cameras.first;
+      cameras.clear();
+      cameras.add(firstCamera);
+      _saveCameras();
+      LoggerService.i('🎯 Ensured single camera: ${firstCamera.name} (removed ${cameras.length - 1} extra cameras)');
     }
   }
 
@@ -282,7 +293,48 @@ class CameraSetupController extends GetxController {
       statusMessage.value = 'Camera saved to Firebase successfully!';
     } catch (e) {
       LoggerService.e('Failed to save camera to Firebase: $e');
-      statusMessage.value = 'Failed to save camera: $e';
+      statusMessage.value = 'Failed to save to Firebase: ${e.toString()}';
+    }
+  }
+
+  /// Save verified RTSP camera locally without Firebase
+  Future<void> saveVerifiedCameraLocally({bool clearForm = true}) async {
+    if (!isStreamValid.value || cameraName.value.isEmpty || rtspUrl.value.isEmpty) {
+      LoggerService.w('Cannot save camera: missing required fields or invalid stream');
+      statusMessage.value = 'Please verify stream and enter camera name';
+      return;
+    }
+
+    try {
+      // Generate camera ID based on current cameras count
+      final cameraId = 'CAM${(cameras.length + 1).toString().padLeft(2, '0')}';
+      
+      // Create camera config with current settings
+      final cameraConfig = CameraConfig(
+        name: cameraName.value,
+        url: rtspUrl.value,
+        confidenceThreshold: 0.15,
+        peopleCountEnabled: true,
+        maxPeople: 5,
+      );
+
+      // Add to local cameras list
+      addCamera(cameraConfig);
+      
+      LoggerService.i('✅ Camera ${cameraName.value} saved locally with ID: $cameraId');
+      statusMessage.value = 'Camera saved locally successfully!';
+      
+      // Clear form for next camera (optional)
+      if (clearForm) {
+        cameraName.value = '';
+        rtspUrl.value = '';
+        isStreamValid.value = false;
+        statusMessage.value = 'Enter RTSP URL to begin';
+      }
+      
+    } catch (e) {
+      LoggerService.e('Failed to save camera locally: $e');
+      statusMessage.value = 'Failed to save camera: ${e.toString()}';
     }
   }
 

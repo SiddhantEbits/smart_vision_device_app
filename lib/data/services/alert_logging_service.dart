@@ -101,7 +101,7 @@ class AlertLoggingService {
 
     try {
       final deviceId = _deviceService.deviceId;
-      final deviceName = _deviceService.currentDevice?.hardwareName ?? 'Unknown Device';
+      final deviceName = _deviceService.currentDevice?.deviceName ?? 'Unknown Device';
       final now = Timestamp.now();
       
       final alert = AlertLog(

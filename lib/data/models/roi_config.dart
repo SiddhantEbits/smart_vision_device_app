@@ -106,4 +106,83 @@ class RoiAlertConfig {
       lineStart.hashCode ^
       lineEnd.hashCode ^
       direction.hashCode;
+
+  // ============================================================
+  // FIREBASE CONVERSION METHODS
+  // ============================================================
+  
+  /// Convert ROI config to Firebase format
+  Map<String, dynamic> toFirebaseMap() {
+    return {
+      'roi': {
+        'left': roi.left,
+        'top': roi.top,
+        'right': roi.right,
+        'bottom': roi.bottom,
+      },
+      'lineStart': {
+        'dx': lineStart.dx,
+        'dy': lineStart.dy,
+      },
+      'lineEnd': {
+        'dx': lineEnd.dx,
+        'dy': lineEnd.dy,
+      },
+      'direction': {
+        'dx': direction.dx,
+        'dy': direction.dy,
+      },
+      'roiType': isFootfall ? 'line' : 'rectangle',
+      'roiCoordinates': [roi.left, roi.top, roi.right, roi.bottom],
+      'lineCoordinates': [lineStart.dx, lineStart.dy, lineEnd.dx, lineEnd.dy],
+    };
+  }
+  
+  /// Create ROI config from Firebase format
+  factory RoiAlertConfig.fromFirebaseMap(Map<String, dynamic> data) {
+    final roiData = data['roi'] as Map<String, dynamic>? ?? {};
+    final lineStartData = data['lineStart'] as Map<String, dynamic>? ?? {};
+    final lineEndData = data['lineEnd'] as Map<String, dynamic>? ?? {};
+    final directionData = data['direction'] as Map<String, dynamic>? ?? {};
+    
+    return RoiAlertConfig(
+      roi: Rect.fromLTWH(
+        roiData['left']?.toDouble() ?? 0.0,
+        roiData['top']?.toDouble() ?? 0.0,
+        (roiData['right']?.toDouble() ?? 1.0) - (roiData['left']?.toDouble() ?? 0.0),
+        (roiData['bottom']?.toDouble() ?? 1.0) - (roiData['top']?.toDouble() ?? 0.0),
+      ),
+      lineStart: Offset(
+        lineStartData['dx']?.toDouble() ?? 0.0,
+        lineStartData['dy']?.toDouble() ?? 0.0,
+      ),
+      lineEnd: Offset(
+        lineEndData['dx']?.toDouble() ?? 0.0,
+        lineEndData['dy']?.toDouble() ?? 0.0,
+      ),
+      direction: Offset(
+        directionData['dx']?.toDouble() ?? 0.0,
+        directionData['dy']?.toDouble() ?? 0.0,
+      ),
+    );
+  }
+  
+  /// Create ROI config from simplified Firebase format (for backward compatibility)
+  factory RoiAlertConfig.fromSimplifiedFirebaseMap(Map<String, dynamic> data) {
+    final roiCoords = data['roiCoordinates'] as List<dynamic>? ?? [0.0, 0.0, 1.0, 1.0];
+    final lineCoords = data['lineCoordinates'] as List<dynamic>? ?? [0.0, 0.5, 1.0, 0.5];
+    final roiType = data['roiType'] as String? ?? 'rectangle';
+    
+    return RoiAlertConfig(
+      roi: Rect.fromLTWH(
+        roiCoords[0].toDouble(),
+        roiCoords[1].toDouble(),
+        roiCoords[2].toDouble() - roiCoords[0].toDouble(),
+        roiCoords[3].toDouble() - roiCoords[1].toDouble(),
+      ),
+      lineStart: Offset(lineCoords[0].toDouble(), lineCoords[1].toDouble()),
+      lineEnd: Offset(lineCoords[2].toDouble(), lineCoords[3].toDouble()),
+      direction: roiType == 'line' ? const Offset(0, 1) : Offset.zero,
+    );
+  }
 }

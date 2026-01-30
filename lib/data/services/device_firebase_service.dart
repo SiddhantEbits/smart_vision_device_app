@@ -110,12 +110,18 @@ class DeviceFirebaseService {
         }
       };
       
+      // Check if document already exists
+      final docSnapshot = await _firestore.collection(_collection).doc(deviceId).get();
+      final isUpdate = docSnapshot.exists;
+      
+      print('🔥 Firebase: ${isUpdate ? "Updating existing" : "Creating new"} device document: $deviceId');
+      
       await _firestore.collection(_collection).doc(deviceId).set(
         deviceData,
         SetOptions(merge: true),
       );
       
-      print('✅ Firebase: Device ID saved successfully: $deviceId');
+      print('✅ Firebase: Device ID ${isUpdate ? "updated" : "created"} successfully: $deviceId');
     } catch (e) {
       print('❌ Firebase: Error saving device ID: $e');
       rethrow;

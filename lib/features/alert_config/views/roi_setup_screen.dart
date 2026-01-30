@@ -3,7 +3,10 @@ import 'package:get/get.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../data/models/alert_config_model.dart';
-import '../../../data/models/roi_config_model.dart';
+import '../../../data/models/roi_config_model.dart' as roi_model;
+import '../../../data/models/roi_config.dart' as camera_config;
+import '../../../data/models/camera_config.dart';
+import '../../../data/repositories/simple_storage_service.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/logging/logger_service.dart';
@@ -21,7 +24,7 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
   late DetectionType detectionType;
   late Function(List<Offset>, String) onComplete;
   
-  RoiAlertConfig roiConfig = RoiAlertConfig.forFootfall();
+  roi_model.RoiAlertConfig roiConfig = roi_model.RoiAlertConfig.forFootfall();
   
   // Media Kit player for RTSP stream
   late Player player;
@@ -37,9 +40,9 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
     
     // Initialize ROI config based on detection type
     if (detectionType == DetectionType.footfallDetection) {
-      roiConfig = RoiAlertConfig.forFootfall();
+      roiConfig = roi_model.RoiAlertConfig.forFootfall();
     } else if (detectionType == DetectionType.restrictedArea) {
-      roiConfig = RoiAlertConfig.forRestrictedArea();
+      roiConfig = roi_model.RoiAlertConfig.forRestrictedArea();
     }
     
     // Initialize Media Kit player
@@ -253,9 +256,9 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
                           onPressed: () {
                             setState(() {
                               if (detectionType == DetectionType.footfallDetection) {
-                                roiConfig = RoiAlertConfig.forFootfall();
+                                roiConfig = roi_model.RoiAlertConfig.forFootfall();
                               } else {
-                                roiConfig = RoiAlertConfig.forRestrictedArea();
+                                roiConfig = roi_model.RoiAlertConfig.forRestrictedArea();
                               }
                             });
                           },
@@ -441,10 +444,108 @@ class _RoiSetupScreenState extends State<RoiSetupScreen> {
     }
     LoggerService.i('ROI Setup - ROI Points: $roiPoints');
     
+    // Save ROI configuration to current camera in local storage
+    _saveRoiConfigToCurrentCamera();
+    
     // Call the onComplete callback with proper type casting
     onComplete(roiPoints.cast<Offset>(), roiType);
     
     // Don't call Get.back() here - the callback will handle navigation
     // This allows the flow to continue to the next detection configuration
+  }
+
+  void _saveRoiConfigToCurrentCamera() {
+    try {
+      // Get the current camera from CameraSetupController
+      final currentCamera = cameraSetupController.currentCamera;
+      
+      if (currentCamera == null) {
+        LoggerService.w('❌ No current camera found to save ROI configuration');
+        Get.snackbar(
+          'Error',
+          'No camera selected. Please select a camera first.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Create a copy of the current camera with updated ROI configuration
+      final updatedCamera = _applyRoiConfigToCamera(currentCamera);
+      
+      // Update the camera in the list
+      final cameraIndex = cameraSetupController.cameras.indexWhere((c) => c.name == currentCamera.name);
+      if (cameraIndex != -1) {
+        cameraSetupController.updateCamera(cameraIndex, updatedCamera);
+        
+        LoggerService.i('✅ ROI configuration saved to camera: ${currentCamera.name} for detection: $detectionType');
+        
+        Get.snackbar(
+          'ROI Saved',
+          'ROI configuration saved to ${currentCamera.name}',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        LoggerService.e('❌ Camera not found in list: ${currentCamera.name}');
+      }
+    } catch (e) {
+      LoggerService.e('❌ Failed to save ROI configuration to camera', e);
+      Get.snackbar(
+        'Save Failed',
+        'Failed to save ROI configuration: ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  CameraConfig _applyRoiConfigToCamera(CameraConfig camera) {
+    // Create a copy of the camera with updated ROI configuration
+    final updatedCamera = CameraConfig(
+      name: camera.name,
+      url: camera.url,
+      confidenceThreshold: camera.confidenceThreshold,
+      
+      // Preserve all existing detection settings
+      peopleCountEnabled: camera.peopleCountEnabled,
+      maxPeople: camera.maxPeople,
+      maxPeopleCooldownSeconds: camera.maxPeopleCooldownSeconds,
+      maxPeopleSchedule: camera.maxPeopleSchedule,
+      
+      footfallEnabled: camera.footfallEnabled,
+      footfallIntervalMinutes: camera.footfallIntervalMinutes,
+      footfallSchedule: camera.footfallSchedule,
+      
+      restrictedAreaEnabled: camera.restrictedAreaEnabled,
+      restrictedAreaCooldownSeconds: camera.restrictedAreaCooldownSeconds,
+      restrictedAreaSchedule: camera.restrictedAreaSchedule,
+      
+      theftAlertEnabled: camera.theftAlertEnabled,
+      theftCooldownSeconds: camera.theftCooldownSeconds,
+      theftSchedule: camera.theftSchedule,
+      
+      absentAlertEnabled: camera.absentAlertEnabled,
+      absentSeconds: camera.absentSeconds,
+      absentCooldownSeconds: camera.absentCooldownSeconds,
+      absentSchedule: camera.absentSchedule,
+      
+      // Apply ROI configuration based on detection type
+      footfallConfig: detectionType == DetectionType.footfallDetection ? _convertRoiConfig(roiConfig) : camera.footfallConfig,
+      restrictedAreaConfig: detectionType == DetectionType.restrictedArea ? _convertRoiConfig(roiConfig) : camera.restrictedAreaConfig,
+    );
+    
+    return updatedCamera;
+  }
+
+  /// Convert RoiAlertConfig from roi_config_model.dart to roi_config.dart
+  camera_config.RoiAlertConfig _convertRoiConfig(roi_model.RoiAlertConfig sourceConfig) {
+    return camera_config.RoiAlertConfig(
+      roi: sourceConfig.roi,
+      lineStart: sourceConfig.lineStart,
+      lineEnd: sourceConfig.lineEnd,
+      direction: sourceConfig.direction,
+    );
   }
 }

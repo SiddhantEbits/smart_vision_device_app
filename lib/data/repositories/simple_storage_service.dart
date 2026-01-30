@@ -5,28 +5,29 @@ import 'package:get_storage/get_storage.dart';
 import '../models/camera_config.dart';
 import '../models/firestore_camera_config.dart';
 import '../models/roi_config.dart';
-import '../models/alert_config_model.dart';
+import '../models/alert_schedule.dart';
 import '../../core/logging/logger_service.dart';
 import '../../core/utils/device_id_coordinator.dart';
 
 /// ===========================================================
-/// LOCAL STORAGE SERVICE
-/// Handles persistent storage with GetStorage and provides
-/// structured data access for Firebase synchronization
+/// SIMPLE STORAGE SERVICE (GetStorage - Fixed)
+/// Uses GetStorage with proper type handling and no conflicts
 /// ===========================================================
-class LocalStorageService {
-  static LocalStorageService? _instance;
-  static LocalStorageService get instance => _instance ??= LocalStorageService._();
+class SimpleStorageService {
+  static SimpleStorageService? _instance;
+  static SimpleStorageService get instance => _instance ??= SimpleStorageService._();
   
-  LocalStorageService._();
+  SimpleStorageService._();
 
   late final GetStorage _storage;
+  bool _isInitialized = false;
   static const String _cameraConfigsKey = 'camera_configs';
   static const String _deviceIdKey = 'device_id';
   static const String _lastSyncTimeKey = 'last_sync_time';
   static const String _pendingChangesKey = 'pending_changes';
   static const String _syncMetadataKey = 'sync_metadata';
   static const String _whatsappConfigKey = 'whatsapp_config';
+  static const String _installerTestsKey = 'installer_tests';
 
   // Public getter for storage access
   GetStorage get storage => _storage;
@@ -35,33 +36,56 @@ class LocalStorageService {
   /// INITIALIZATION
   /// ===========================================================
   Future<void> init() async {
-    await GetStorage.init();
-    _storage = GetStorage();
-    
-    // Initialize device ID using DeviceIdCoordinator if not exists or migrate old UUID
-    if (!_storage.hasData(_deviceIdKey)) {
-      final deviceId = await DeviceIdCoordinator.getDeviceId();
-      _storage.write(_deviceIdKey, deviceId);
-      LoggerService.i('🆔 Device ID set from DeviceIdCoordinator: $deviceId');
-    } else {
-      // Check if we have an old UUID format that needs migration
-      final storageDeviceId = _storage.read(_deviceIdKey);
-      
-      // Detect old UUID format (contains hyphens and is longer than 20 chars)
-      if (storageDeviceId.toString().contains('-') && storageDeviceId.toString().length > 20) {
-        LoggerService.w('⚠️ LocalStorage: Detected old UUID format: $storageDeviceId');
-        
-        // Get proper device ID from DeviceIdCoordinator
-        final properDeviceId = await DeviceIdCoordinator.getDeviceId();
-        
-        // Update storage with proper device ID
-        _storage.write(_deviceIdKey, properDeviceId);
-        LoggerService.i('🔄 LocalStorage: Migrated old UUID to proper device ID: $properDeviceId');
-      }
+    if (_isInitialized) {
+      LoggerService.w('⚠️ SimpleStorageService already initialized, skipping...');
+      return;
     }
-    
-    // Initialize storage structure if needed
-    await _initializeStorageStructure();
+
+    try {
+      // Initialize GetStorage
+      await GetStorage.init();
+      _storage = GetStorage();
+      _isInitialized = true;
+      
+      // Initialize device ID using DeviceIdCoordinator if not exists or migrate old UUID
+      if (!_storage.hasData(_deviceIdKey)) {
+        final deviceId = await DeviceIdCoordinator.getDeviceId();
+        _storage.write(_deviceIdKey, deviceId);
+        LoggerService.i('🆔 Device ID set from DeviceIdCoordinator: $deviceId');
+      } else {
+        // Check if we have an old UUID format that needs migration
+        final storageDeviceId = _storage.read(_deviceIdKey);
+        
+        // Detect old UUID format (contains hyphens and is longer than 20 chars)
+        if (storageDeviceId.toString().contains('-') && storageDeviceId.toString().length > 20) {
+          LoggerService.w('⚠️ Detected old UUID format: $storageDeviceId');
+          
+          // Get proper device ID from DeviceIdCoordinator
+          final properDeviceId = await DeviceIdCoordinator.getDeviceId();
+          
+          // Update storage with proper device ID
+          _storage.write(_deviceIdKey, properDeviceId);
+          LoggerService.i('🔄 Migrated old UUID to proper device ID: $properDeviceId');
+        } else {
+          // Ensure storage is synchronized with DeviceIdCoordinator
+          final coordinatorDeviceId = await DeviceIdCoordinator.getDeviceId();
+          
+          if (coordinatorDeviceId != storageDeviceId) {
+            // Sync storage with DeviceIdCoordinator
+            _storage.write(_deviceIdKey, coordinatorDeviceId);
+            LoggerService.i('🔄 Synced storage with DeviceIdCoordinator: $coordinatorDeviceId');
+          }
+        }
+      }
+      
+      // Initialize storage structure if needed
+      await _initializeStorageStructure();
+      
+      LoggerService.i('✅ SimpleStorageService initialized successfully');
+    } catch (e) {
+      LoggerService.e('❌ Failed to initialize SimpleStorageService', e);
+      rethrow;
+    }
   }
 
   Future<void> _initializeStorageStructure() async {
@@ -110,19 +134,19 @@ class LocalStorageService {
           final config = CameraConfig.fromJson(configJson);
           configs.add(config);
         } catch (e) {
-          print('Error parsing camera config for key ${entry.key}: $e');
+          LoggerService.w('⚠️ Error parsing camera config for key ${entry.key}: $e');
         }
       }
       
       return configs;
     } catch (e) {
-      print('Error getting camera configs: $e');
+      LoggerService.e('❌ Error getting camera configs', e);
       return [];
     }
   }
 
   /// Save camera config to local storage
-  Future<void> saveCameraConfig(CameraConfig config) async {
+  Future<bool> saveCameraConfig(CameraConfig config) async {
     try {
       final configsData = _storage.read(_cameraConfigsKey) as Map<String, dynamic>? ?? {};
       configsData[config.name] = config.toJson();
@@ -130,14 +154,17 @@ class LocalStorageService {
       
       // Mark as pending change for sync
       await _markPendingChange('camera_config_${config.name}', 'update');
+      
+      LoggerService.i('✅ Saved camera config: ${config.name}');
+      return true;
     } catch (e) {
-      print('Error saving camera config ${config.name}: $e');
-      rethrow;
+      LoggerService.e('❌ Error saving camera config ${config.name}', e);
+      return false;
     }
   }
 
   /// Delete camera config from local storage
-  Future<void> deleteCameraConfig(String cameraName) async {
+  Future<bool> deleteCameraConfig(String cameraName) async {
     try {
       final configsData = _storage.read(_cameraConfigsKey) as Map<String, dynamic>? ?? {};
       configsData.remove(cameraName);
@@ -145,9 +172,12 @@ class LocalStorageService {
       
       // Mark as pending change for sync
       await _markPendingChange('camera_config_$cameraName', 'delete');
+      
+      LoggerService.i('✅ Deleted camera config: $cameraName');
+      return true;
     } catch (e) {
-      print('Error deleting camera config $cameraName: $e');
-      rethrow;
+      LoggerService.e('❌ Error deleting camera config $cameraName', e);
+      return false;
     }
   }
 
@@ -162,7 +192,7 @@ class LocalStorageService {
       }
       return null;
     } catch (e) {
-      print('Error getting camera config $name: $e');
+      LoggerService.e('❌ Error getting camera config $name', e);
       return null;
     }
   }
@@ -183,38 +213,44 @@ class LocalStorageService {
           final config = _firestoreConfigFromJson(configJson);
           configs.add(config);
         } catch (e) {
-          print('Error parsing Firestore camera config for key ${entry.key}: $e');
+          LoggerService.w('⚠️ Error parsing Firestore camera config for key ${entry.key}: $e');
         }
       }
       
       return configs;
     } catch (e) {
-      print('Error getting Firestore camera configs: $e');
+      LoggerService.e('❌ Error getting Firestore camera configs', e);
       return [];
     }
   }
 
   /// Save Firestore camera config to local storage
-  Future<void> saveFirestoreCameraConfig(FirestoreCameraConfig config) async {
+  Future<bool> saveFirestoreCameraConfig(FirestoreCameraConfig config) async {
     try {
       final configsData = _storage.read('firestore_camera_configs') as Map<String, dynamic>? ?? {};
       configsData[config.id] = _firestoreConfigToJson(config);
       await _storage.write('firestore_camera_configs', configsData);
+      
+      LoggerService.i('✅ Saved Firestore camera config: ${config.id}');
+      return true;
     } catch (e) {
-      print('Error saving Firestore camera config ${config.id}: $e');
-      rethrow;
+      LoggerService.e('❌ Error saving Firestore camera config ${config.id}', e);
+      return false;
     }
   }
 
   /// Delete Firestore camera config from local storage
-  Future<void> deleteFirestoreCameraConfig(String configId) async {
+  Future<bool> deleteFirestoreCameraConfig(String configId) async {
     try {
       final configsData = _storage.read('firestore_camera_configs') as Map<String, dynamic>? ?? {};
       configsData.remove(configId);
       await _storage.write('firestore_camera_configs', configsData);
+      
+      LoggerService.i('✅ Deleted Firestore camera config: $configId');
+      return true;
     } catch (e) {
-      print('Error deleting Firestore camera config $configId: $e');
-      rethrow;
+      LoggerService.e('❌ Error deleting Firestore camera config $configId', e);
+      return false;
     }
   }
 
@@ -227,18 +263,30 @@ class LocalStorageService {
     return timestamp != null ? DateTime.fromMillisecondsSinceEpoch(timestamp) : null;
   }
 
-  Future<void> updateLastSyncTime() async {
-    await _storage.write(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
+  Future<bool> updateLastSyncTime() async {
+    try {
+      await _storage.write(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Error updating last sync time', e);
+      return false;
+    }
   }
 
   Map<String, dynamic> get syncMetadata {
     return _storage.read(_syncMetadataKey) as Map<String, dynamic>? ?? {};
   }
 
-  Future<void> updateSyncMetadata(Map<String, dynamic> metadata) async {
-    final current = syncMetadata;
-    current.addAll(metadata);
-    await _storage.write(_syncMetadataKey, current);
+  Future<bool> updateSyncMetadata(Map<String, dynamic> metadata) async {
+    try {
+      final current = syncMetadata;
+      current.addAll(metadata);
+      await _storage.write(_syncMetadataKey, current);
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Error updating sync metadata', e);
+      return false;
+    }
   }
 
   /// ===========================================================
@@ -258,127 +306,109 @@ class LocalStorageService {
         return {};
       }
     } catch (e) {
-      print('Error getting pending changes: $e');
+      LoggerService.e('❌ Error getting pending changes', e);
       return {};
     }
   }
 
-  Future<void> _markPendingChange(String key, String operation) async {
+  Future<bool> _markPendingChange(String key, String operation) async {
     try {
       final pending = pendingChanges;
       pending[key] = operation;
       await _storage.write(_pendingChangesKey, pending);
-    } catch (e) {
-      print('Error in _markPendingChange: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> clearPendingChange(String key) async {
-    final pending = pendingChanges;
-    pending.remove(key);
-    await _storage.write(_pendingChangesKey, pending);
-  }
-
-  Future<void> clearAllPendingChanges() async {
-    await _storage.write(_pendingChangesKey, <String, dynamic>{});
-  }
-
-  /// ===========================================================
-  /// DATA VALIDATION
-  /// ===========================================================
-  
-  /// Validate camera config before saving
-  bool validateCameraConfig(CameraConfig config) {
-    // Basic validation
-    if (config.name.isEmpty || config.url.isEmpty) {
-      return false;
-    }
-
-    // URL validation (basic RTSP check)
-    if (!config.url.startsWith('rtsp://') && !config.url.startsWith('http://') && !config.url.startsWith('https://')) {
-      return false;
-    }
-
-    // ROI validation
-    if (config.footfallEnabled) {
-      final roi = config.footfallConfig.roi;
-      if (roi.left < 0 || roi.top < 0 || roi.right > 1 || roi.bottom > 1) {
-        return false;
-      }
-    }
-
-    if (config.restrictedAreaEnabled) {
-      final roi = config.restrictedAreaConfig.roi;
-      if (roi.left < 0 || roi.top < 0 || roi.right > 1 || roi.bottom > 1) {
-        return false;
-      }
-    }
-
-    // Confidence threshold validation
-    if (config.confidenceThreshold < 0 || config.confidenceThreshold > 1) {
-      return false;
-    }
-
-    return true;
-  }
-
-  /// ===========================================================
-  /// IMPORT/EXPORT UTILITIES
-  /// ===========================================================
-  
-  /// Export all data as JSON string
-  String exportData() {
-    final exportData = {
-      'deviceId': deviceId,
-      'cameraConfigs': getCameraConfigs().map((c) => c.toJson()).toList(),
-      'firestoreConfigs': getFirestoreCameraConfigs().map((c) => _firestoreConfigToJson(c)).toList(),
-      'syncMetadata': syncMetadata,
-      'pendingChanges': pendingChanges,
-      'exportTime': DateTime.now().toIso8601String(),
-    };
-    
-    return jsonEncode(exportData);
-  }
-
-  /// Import data from JSON string
-  Future<bool> importData(String jsonData) async {
-    try {
-      final importData = jsonDecode(jsonData) as Map<String, dynamic>;
-      
-      // Import camera configs
-      final cameraConfigsData = importData['cameraConfigs'] as List?;
-      if (cameraConfigsData != null) {
-        final configsData = _storage.read(_cameraConfigsKey) as Map<String, dynamic>? ?? {};
-        for (final configJson in cameraConfigsData) {
-          final config = CameraConfig.fromJson(configJson as Map<String, dynamic>);
-          if (validateCameraConfig(config)) {
-            configsData[config.name] = config.toJson();
-          }
-        }
-        await _storage.write(_cameraConfigsKey, configsData);
-      }
-      
-      // Import Firestore configs
-      final firestoreConfigsData = importData['firestoreConfigs'] as List?;
-      if (firestoreConfigsData != null) {
-        final configsData = <String, dynamic>{};
-        for (final configJson in firestoreConfigsData) {
-          final config = _firestoreConfigFromJson(configJson as Map<String, dynamic>);
-          configsData[config.id] = _firestoreConfigToJson(config);
-        }
-        await _storage.write('firestore_camera_configs', configsData);
-      }
-      
-      // Import sync metadata
-      final syncMetadata = importData['syncMetadata'] as Map<String, dynamic>?;
-      if (syncMetadata != null) {
-        await updateSyncMetadata(syncMetadata);
-      }
-      
       return true;
     } catch (e) {
-      print('Error importing data: $e');
+      LoggerService.e('❌ Error in _markPendingChange', e);
+      return false;
+    }
+  }
+
+  Future<bool> clearPendingChange(String key) async {
+    try {
+      final pending = pendingChanges;
+      pending.remove(key);
+      await _storage.write(_pendingChangesKey, pending);
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Error clearing pending change', e);
+      return false;
+    }
+  }
+
+  Future<bool> clearAllPendingChanges() async {
+    try {
+      await _storage.write(_pendingChangesKey, <String, dynamic>{});
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Error clearing all pending changes', e);
+      return false;
+    }
+  }
+
+  /// ===========================================================
+  /// INSTALLER TEST MANAGEMENT
+  /// ===========================================================
+  
+  /// Save installer test result locally
+  Future<bool> saveInstallerTest({
+    required String cameraId,
+    required String algorithmType,
+    required bool pass,
+  }) async {
+    try {
+      final tests = _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
+      
+      // Ensure camera exists
+      if (!tests.containsKey(cameraId)) {
+        tests[cameraId] = <String, dynamic>{};
+      }
+      
+      // Save test result
+      tests[cameraId][algorithmType] = {
+        'algorithmType': algorithmType,
+        'pass': pass,
+        'testedAt': DateTime.now().toIso8601String(),
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      
+      await _storage.write(_installerTestsKey, tests);
+      LoggerService.i('✅ Saved installer test: $cameraId/$algorithmType = $pass');
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Failed to save installer test', e);
+      return false;
+    }
+  }
+  
+  /// Get all installer tests for a camera
+  Map<String, dynamic>? getInstallerTests(String cameraId) {
+    try {
+      final tests = _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
+      return tests[cameraId] as Map<String, dynamic>?;
+    } catch (e) {
+      LoggerService.e('❌ Failed to get installer tests for camera: $cameraId', e);
+      return null;
+    }
+  }
+  
+  /// Get all installer tests for all cameras
+  Map<String, dynamic> getAllInstallerTests() {
+    try {
+      return _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
+    } catch (e) {
+      LoggerService.e('❌ Failed to get all installer tests', e);
+      return {};
+    }
+  }
+  
+  /// Clear all installer tests (after successful sync to Firebase)
+  Future<bool> clearInstallerTests() async {
+    try {
+      await _storage.remove(_installerTestsKey);
+      LoggerService.i('✅ Cleared all installer tests after Firebase sync');
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Failed to clear installer tests', e);
       return false;
     }
   }
@@ -404,7 +434,7 @@ class LocalStorageService {
         };
       }
     } catch (e) {
-      print('Error getting WhatsApp config: $e');
+      LoggerService.e('❌ Error getting WhatsApp config', e);
       return {
         'alertEnable': false,
         'phoneNumbers': <String>[],
@@ -413,7 +443,7 @@ class LocalStorageService {
   }
   
   /// Save WhatsApp configuration to local storage
-  Future<void> saveWhatsAppConfig({
+  Future<bool> saveWhatsAppConfig({
     bool? alertEnable,
     List<String>? phoneNumbers,
   }) async {
@@ -437,14 +467,38 @@ class LocalStorageService {
       
       // Mark as pending change for sync
       await _markPendingChange('whatsapp_config', 'update');
+      
+      LoggerService.i('✅ Saved WhatsApp config');
+      return true;
     } catch (e) {
-      print('Error saving WhatsApp config: $e');
-      rethrow;
+      LoggerService.e('❌ Error saving WhatsApp config', e);
+      return false;
     }
   }
-  
+
+  /// Enable/disable WhatsApp alerts
+  Future<bool> setWhatsAppAlertsEnabled(bool enabled) async {
+    try {
+      return await saveWhatsAppConfig(alertEnable: enabled);
+    } catch (e) {
+      LoggerService.e('❌ Error setting WhatsApp alerts enabled', e);
+      return false;
+    }
+  }
+
+  /// Check if WhatsApp alerts are enabled
+  bool getWhatsAppAlertsEnabled() {
+    try {
+      final config = getWhatsAppConfig();
+      return config['alertEnable'] ?? false;
+    } catch (e) {
+      LoggerService.e('❌ Error getting WhatsApp alerts enabled', e);
+      return false;
+    }
+  }
+
   /// Add phone number to WhatsApp configuration
-  Future<void> addWhatsAppPhoneNumber(String phoneNumber) async {
+  Future<bool> addWhatsAppPhoneNumber(String phoneNumber) async {
     try {
       final config = getWhatsAppConfig();
       
@@ -460,15 +514,15 @@ class LocalStorageService {
       phoneNumbers.removeWhere((number) => number == phoneNumber);
       phoneNumbers.add(phoneNumber);
       
-      await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
+      return await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
     } catch (e) {
-      print('Error adding WhatsApp phone number: $e');
-      rethrow;
+      LoggerService.e('❌ Error adding WhatsApp phone number', e);
+      return false;
     }
   }
   
   /// Remove phone number from WhatsApp configuration
-  Future<void> removeWhatsAppPhoneNumber(String phoneNumber) async {
+  Future<bool> removeWhatsAppPhoneNumber(String phoneNumber) async {
     try {
       final config = getWhatsAppConfig();
       
@@ -482,10 +536,10 @@ class LocalStorageService {
       
       phoneNumbers.removeWhere((number) => number == phoneNumber);
       
-      await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
+      return await saveWhatsAppConfig(phoneNumbers: phoneNumbers);
     } catch (e) {
-      print('Error removing WhatsApp phone number: $e');
-      rethrow;
+      LoggerService.e('❌ Error removing WhatsApp phone number', e);
+      return false;
     }
   }
   
@@ -503,29 +557,8 @@ class LocalStorageService {
       
       return [];
     } catch (e) {
-      print('Error getting WhatsApp phone numbers: $e');
+      LoggerService.e('❌ Error getting WhatsApp phone numbers', e);
       return [];
-    }
-  }
-  
-  /// Enable/disable WhatsApp alerts
-  Future<void> setWhatsAppAlertsEnabled(bool enabled) async {
-    try {
-      await saveWhatsAppConfig(alertEnable: enabled);
-    } catch (e) {
-      print('Error setting WhatsApp alerts enabled: $e');
-      rethrow;
-    }
-  }
-  
-  /// Check if WhatsApp alerts are enabled
-  bool getWhatsAppAlertsEnabled() {
-    try {
-      final config = getWhatsAppConfig();
-      return config['alertEnable'] ?? false;
-    } catch (e) {
-      print('Error getting WhatsApp alerts enabled: $e');
-      return false;
     }
   }
 
@@ -533,10 +566,34 @@ class LocalStorageService {
   /// STORAGE UTILITIES
   /// ===========================================================
   
+  /// Get storage statistics
+  Future<Map<String, dynamic>> getStorageStats() async {
+    try {
+      return {
+        'cameraConfigs': getCameraConfigs().length,
+        'firestoreConfigs': getFirestoreCameraConfigs().length,
+        'installerTests': getAllInstallerTests().length,
+        'pendingChanges': pendingChanges.length,
+        'lastSyncTime': lastSyncTime?.toIso8601String(),
+        'deviceId': deviceId,
+      };
+    } catch (e) {
+      LoggerService.e('❌ Error getting storage stats', e);
+      return {};
+    }
+  }
+
   /// Clear all local data
-  Future<void> clearAllData() async {
-    await _storage.erase();
-    await init();
+  Future<bool> clearAllData() async {
+    try {
+      await _storage.erase();
+      await init();
+      LoggerService.i('✅ Cleared all data and reinitialized storage');
+      return true;
+    } catch (e) {
+      LoggerService.e('❌ Error clearing all data', e);
+      return false;
+    }
   }
 
   /// Get storage size estimate
@@ -554,7 +611,7 @@ class LocalStorageService {
       
       return totalSize;
     } catch (e) {
-      print('Error calculating storage size: $e');
+      LoggerService.e('❌ Error calculating storage size', e);
       return 0;
     }
   }
@@ -576,44 +633,29 @@ class LocalStorageService {
       // Features
       peopleCountEnabled: json['peopleCountEnabled'] ?? true,
 
-      // Footfall
+      // Footfall - Use simple JSON to avoid type conflicts
       footfallEnabled: json['footfallEnabled'] ?? false,
       footfallConfig: _roiFromJson(json['footfallConfig']),
-      footfallSchedule: json['footfallSchedule'] != null
-          ? _scheduleFromJson(json['footfallSchedule'])
-          : null,
       footfallIntervalMinutes: json['footfallIntervalMinutes'] ?? 60,
 
       // Max people
       maxPeopleEnabled: json['maxPeopleEnabled'] ?? false,
       maxPeople: json['maxPeople'] ?? 5,
       maxPeopleCooldownSeconds: json['maxPeopleCooldownSeconds'] ?? 300,
-      maxPeopleSchedule: json['maxPeopleSchedule'] != null
-          ? _scheduleFromJson(json['maxPeopleSchedule'])
-          : null,
 
       // Absent
       absentAlertEnabled: json['absentAlertEnabled'] ?? false,
       absentSeconds: json['absentSeconds'] ?? 60,
       absentCooldownSeconds: json['absentCooldownSeconds'] ?? 600,
-      absentSchedule: json['absentSchedule'] != null
-          ? _scheduleFromJson(json['absentSchedule'])
-          : null,
 
       // Theft
       theftAlertEnabled: json['theftAlertEnabled'] ?? false,
       theftCooldownSeconds: json['theftCooldownSeconds'] ?? 300,
-      theftSchedule: json['theftSchedule'] != null
-          ? _scheduleFromJson(json['theftSchedule'])
-          : null,
 
       // Restricted Area
       restrictedAreaEnabled: json['restrictedAreaEnabled'] ?? true,
       restrictedAreaConfig: _roiFromJson(json['restrictedAreaConfig']),
       restrictedAreaCooldownSeconds: json['restrictedAreaCooldownSeconds'] ?? 300,
-      restrictedAreaSchedule: json['restrictedAreaSchedule'] != null
-          ? _scheduleFromJson(json['restrictedAreaSchedule'])
-          : null,
 
       // YOLO
       confidenceThreshold: (json['confidenceThreshold'] as num?)?.toDouble() ?? 0.15,
@@ -633,39 +675,28 @@ class LocalStorageService {
       // Features
       'peopleCountEnabled': config.peopleCountEnabled,
 
-      // Footfall
+      // Footfall - Store as simple JSON to avoid type conflicts
       'footfallEnabled': config.footfallEnabled,
       'footfallConfig': _roiToJson(config.footfallConfig),
-      if (config.footfallSchedule != null)
-        'footfallSchedule': _scheduleToJson(config.footfallSchedule!),
-      'footfallIntervalMinutes': config.footfallIntervalMinutes,
 
       // Max people
       'maxPeopleEnabled': config.maxPeopleEnabled,
       'maxPeople': config.maxPeople,
       'maxPeopleCooldownSeconds': config.maxPeopleCooldownSeconds,
-      if (config.maxPeopleSchedule != null)
-        'maxPeopleSchedule': _scheduleToJson(config.maxPeopleSchedule!),
 
       // Absent
       'absentAlertEnabled': config.absentAlertEnabled,
       'absentSeconds': config.absentSeconds,
       'absentCooldownSeconds': config.absentCooldownSeconds,
-      if (config.absentSchedule != null)
-        'absentSchedule': _scheduleToJson(config.absentSchedule!),
 
       // Theft
       'theftAlertEnabled': config.theftAlertEnabled,
       'theftCooldownSeconds': config.theftCooldownSeconds,
-      if (config.theftSchedule != null)
-        'theftSchedule': _scheduleToJson(config.theftSchedule!),
 
       // Restricted Area
       'restrictedAreaEnabled': config.restrictedAreaEnabled,
       'restrictedAreaConfig': _roiToJson(config.restrictedAreaConfig),
       'restrictedAreaCooldownSeconds': config.restrictedAreaCooldownSeconds,
-      if (config.restrictedAreaSchedule != null)
-        'restrictedAreaSchedule': _scheduleToJson(config.restrictedAreaSchedule!),
 
       // YOLO
       'confidenceThreshold': config.confidenceThreshold,
@@ -710,88 +741,5 @@ class LocalStorageService {
         'y': c.direction.dy,
       },
     };
-  }
-
-  AlertSchedule _scheduleFromJson(Map<String, dynamic> json) {
-    return AlertSchedule(
-      startTime: json['startTime'] ?? '00:00',
-      endTime: json['endTime'] ?? '23:59',
-      days: List<int>.from(json['days'] ?? [1, 2, 3, 4, 5, 6, 7]),
-    );
-  }
-
-  Map<String, dynamic> _scheduleToJson(AlertSchedule schedule) {
-    return {
-      'startTime': schedule.startTime,
-      'endTime': schedule.endTime,
-      'days': schedule.days,
-    };
-  }
-
-  /// ===========================================================
-  /// INSTALLER TEST MANAGEMENT
-  /// ===========================================================
-  
-  static const String _installerTestsKey = 'installer_tests';
-  
-  /// Save installer test result locally
-  Future<void> saveInstallerTest({
-    required String cameraId,
-    required String algorithmType,
-    required bool pass,
-  }) async {
-    try {
-      final tests = _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
-      
-      // Ensure camera exists
-      if (!tests.containsKey(cameraId)) {
-        tests[cameraId] = <String, dynamic>{};
-      }
-      
-      // Save test result
-      tests[cameraId][algorithmType] = {
-        'algorithmType': algorithmType,
-        'pass': pass,
-        'testedAt': DateTime.now().toIso8601String(),
-        'createdAt': DateTime.now().toIso8601String(),
-      };
-      
-      await _storage.write(_installerTestsKey, tests);
-      LoggerService.i('✅ Saved installer test: $cameraId/$algorithmType = $pass');
-    } catch (e) {
-      LoggerService.e('❌ Failed to save installer test', e);
-      rethrow;
-    }
-  }
-  
-  /// Get all installer tests for a camera
-  Map<String, dynamic>? getInstallerTests(String cameraId) {
-    try {
-      final tests = _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
-      return tests[cameraId] as Map<String, dynamic>?;
-    } catch (e) {
-      LoggerService.e('❌ Failed to get installer tests for camera: $cameraId', e);
-      return null;
-    }
-  }
-  
-  /// Get all installer tests for all cameras
-  Map<String, dynamic> getAllInstallerTests() {
-    try {
-      return _storage.read(_installerTestsKey) as Map<String, dynamic>? ?? {};
-    } catch (e) {
-      LoggerService.e('❌ Failed to get all installer tests', e);
-      return {};
-    }
-  }
-  
-  /// Clear all installer tests (after successful sync to Firebase)
-  Future<void> clearInstallerTests() async {
-    try {
-      await _storage.remove(_installerTestsKey);
-      LoggerService.i('✅ Cleared all installer tests after Firebase sync');
-    } catch (e) {
-      LoggerService.e('❌ Failed to clear installer tests', e);
-    }
   }
 }

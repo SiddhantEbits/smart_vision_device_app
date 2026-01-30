@@ -205,58 +205,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                             
                             SizedBox(height: 32.adaptSize),
                             
-                            // Connection Status Card
-                            Container(
-                              padding: EdgeInsets.all(20.adaptSize),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(16.adaptSize),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.12),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 12.adaptSize,
-                                        height: 12.adaptSize,
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                      SizedBox(width: 12.adaptSize),
-                                      Text(
-                                        'No Stream',
-                                        style: TextStyle(
-                                          fontSize: 14.adaptSize,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 12.adaptSize),
-                                  Text(
-                                    'Configure RTSP URL to begin streaming',
-                                    style: TextStyle(
-                                      fontSize: 11.adaptSize,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+
                             
                             SizedBox(height: 32.adaptSize),
                             
@@ -297,67 +246,6 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                                       ),
                                     ),
                                   )),
-                                ),
-                                
-                                SizedBox(height: 16.adaptSize),
-                                
-                                // Save to Firebase Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: Obx(() => ElevatedButton.icon(
-                                    onPressed: controller.isStreamValid.value && controller.cameraName.value.isNotEmpty
-                                        ? () => controller.saveCameraToFirebase()
-                                        : null,
-                                    icon: Icon(Icons.cloud_upload, size: 18.adaptSize),
-                                    label: Text(
-                                      'Save to Firebase',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14.adaptSize,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: controller.isStreamValid.value && controller.cameraName.value.isNotEmpty
-                                          ? Colors.blue
-                                          : Colors.grey,
-                                      padding: EdgeInsets.symmetric(vertical: 16.adaptSize),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12.adaptSize),
-                                      ),
-                                    ),
-                                  )),
-                                ),
-                                
-                                SizedBox(height: 16.adaptSize),
-                                
-                                // Next Button (disabled until stream is valid and camera has name)
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: (controller.isStreamValid.value && controller.cameraName.value.isNotEmpty) ? () {
-                                      controller.stopStream();
-                                      Get.toNamed(AppRoutes.detectionSelection);
-                                    } : null,
-                                    icon: Icon(Icons.arrow_forward, size: 18.adaptSize),
-                                    label: Text(
-                                      'Next',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14.adaptSize,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: (controller.isStreamValid.value && controller.cameraName.value.isNotEmpty) ? AppTheme.successColor : Colors.grey,
-                                      padding: EdgeInsets.symmetric(vertical: 16.adaptSize),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12.adaptSize),
-                                      ),
-                                    ),
-                                  ),
                                 ),
                               ],
                             ),
@@ -480,42 +368,15 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                                 
                                 SizedBox(height: 16.adaptSize),
                                 
-                                // Update in Firebase Button
+                                // Next Button (disabled until stream is valid and camera has name)
                                 SizedBox(
                                   width: double.infinity,
                                   child: Obx(() => ElevatedButton.icon(
-                                    onPressed: controller.isStreamValid.value && controller.cameraName.value.isNotEmpty
-                                        ? () => controller.updateCameraInFirebase()
-                                        : null,
-                                    icon: Icon(Icons.cloud_sync, size: 18.adaptSize),
-                                    label: Text(
-                                      'Update in Firebase',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14.adaptSize,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: controller.isStreamValid.value && controller.cameraName.value.isNotEmpty
-                                          ? Colors.orange
-                                          : Colors.grey,
-                                      padding: EdgeInsets.symmetric(vertical: 16.adaptSize),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12.adaptSize),
-                                      ),
-                                    ),
-                                  )),
-                                ),
-                                
-                                SizedBox(height: 16.adaptSize),
-                                
-                                // Next Button
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: (controller.isStreamValid.value && controller.cameraName.value.isNotEmpty) ? () {
+                                    onPressed: (controller.isStreamValid.value && controller.cameraName.value.isNotEmpty) ? () async {
+                                      // Save camera details locally first (don't clear form)
+                                      await controller.saveVerifiedCameraLocally(clearForm: false);
+                                      
+                                      // Stop stream and navigate
                                       controller.stopStream();
                                       Get.toNamed(AppRoutes.detectionSelection);
                                     } : null,
@@ -536,7 +397,7 @@ class _CameraSetupScreenState extends State<CameraSetupScreen> {
                                         borderRadius: BorderRadius.circular(12.adaptSize),
                                       ),
                                     ),
-                                  ),
+                                  )),
                                 ),
                               ],
                             ),

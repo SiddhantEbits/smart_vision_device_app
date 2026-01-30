@@ -87,20 +87,20 @@ class DeviceManagementService {
       
       if (deviceDoc.exists) {
         _currentDevice = deviceDoc.data();
-        debugPrint('📱 Existing device found: ${_currentDevice!.hardwareName}');
+        debugPrint('📱 Existing device found: ${_currentDevice!.deviceName}');
         
         // Update device status to online
         await _updateDeviceStatus(DeviceStatus.online);
       } else {
         // Create new device document
         _currentDevice = await _createNewDevice();
-        debugPrint('📱 New device created: ${_currentDevice!.hardwareName}');
+        debugPrint('📱 New device created: ${_currentDevice!.deviceName}');
       }
       
       // Save device info to local storage
       await _localStorage.updateSyncMetadata({
         'deviceId': _deviceId,
-        'deviceName': _currentDevice!.hardwareName ?? 'Unknown Device',
+        'deviceName': _currentDevice!.deviceName ?? 'Unknown Device',
         'lastHeartbeat': DateTime.now().toIso8601String(),
       });
       
@@ -117,7 +117,7 @@ class DeviceManagementService {
       status: DeviceStatus.online,
       lastSeen: now,
       createdAt: now,
-      hardwareName: _getDeviceName(),
+      deviceName: _getDeviceName(),
       appVersion: _getAppVersion(),
     );
 

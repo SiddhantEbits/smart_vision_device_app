@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/constants/sizer.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 import 'core/logging/logger_service.dart';
+import 'core/utils/device_id_coordinator.dart';
 
 import 'data/services/yolo_service.dart';
 import 'data/services/alert_manager.dart';
@@ -15,8 +15,9 @@ import 'data/services/ffmpeg_service.dart';
 import 'data/services/whatsapp_service.dart';
 import 'data/services/snapshot_manager.dart';
 import 'data/services/rtsp_snapshot_service.dart';
+import 'data/services/frame_snapshot_service.dart';
 import 'data/services/camera_log_service.dart';
-import 'data/repositories/local_storage_service.dart';
+import 'data/repositories/simple_storage_service.dart';
 import 'core/utils/cooldown_manager.dart';
 import 'features/camera_setup/controller/camera_setup_controller.dart';
 
@@ -26,11 +27,13 @@ void main() async {
   // MediaKit Initialization
   MediaKit.ensureInitialized();
   
-  // Storage Initialization
-  await GetStorage.init();
-  
-  // Initialize LocalStorageService before app starts
-  await LocalStorageService.instance.init();
+  // Initialize DeviceIdCoordinator FIRST to ensure single device ID
+  try {
+    await DeviceIdCoordinator.initialize();
+    LoggerService.i('DeviceIdCoordinator Initialized');
+  } catch (e) {
+    LoggerService.e('DeviceIdCoordinator initialization failed', e);
+  }
   
   // Firebase Initialization
   try {
@@ -71,7 +74,7 @@ class GlobalBinding extends Bindings {
   @override
   void dependencies() {
     // Storage - Initialize first (synchronous)
-    Get.put(LocalStorageService.instance, permanent: true);
+    Get.put(SimpleStorageService.instance, permanent: true);
     
     // Infrastructure - Register dependencies first
     Get.put(CooldownManager(), permanent: true);
@@ -80,11 +83,11 @@ class GlobalBinding extends Bindings {
     // Media & Hardware
     Get.put(FFmpegService(), permanent: true);
     Get.put(RTSPSnapshotService(), permanent: true);
+    Get.put(FrameSnapshotService(), permanent: true);
     Get.put(SnapshotManager(), permanent: true);
     
     // Core AI & Messaging
     Get.put(YoloService(), permanent: true);
-    Get.put(WhatsAppAlertService(), permanent: true);
     
     // Alert Management - Depends on all above services
     Get.put(AlertManager(), permanent: true);
@@ -100,10 +103,10 @@ class GlobalBinding extends Bindings {
     try {
       debugPrint('🚀 Starting async services initialization...');
       
-      // Initialize LocalStorageService asynchronously
-      debugPrint('📦 Initializing LocalStorageService...');
-      await LocalStorageService.instance.init();
-      debugPrint('✅ LocalStorageService initialized');
+      // Initialize SimpleStorageService asynchronously
+      debugPrint('📦 Initializing SimpleStorageService...');
+      await SimpleStorageService.instance.init();
+      debugPrint('✅ SimpleStorageService initialized');
       
       // Initialize YOLO model asynchronously
       debugPrint('🤖 Initializing YOLO model...');

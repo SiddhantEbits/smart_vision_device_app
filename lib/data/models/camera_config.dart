@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'alert_schedule.dart';
+import 'alert_config_model.dart';
 import 'roi_config.dart';
 
 /// ===========================================================
@@ -118,7 +118,7 @@ class CameraConfig {
           ? _roiFromJson(json['footfallConfig'])
           : RoiAlertConfig.defaultConfig(),
       footfallSchedule: json['footfallSchedule'] != null
-          ? AlertSchedule.fromJson(json['footfallSchedule'])
+          ? AlertSchedule.fromMap(json['footfallSchedule'])
           : null,
       footfallIntervalMinutes:
       (json['footfallIntervalMinutes'] as num?)?.toInt() ?? 60,
@@ -129,7 +129,7 @@ class CameraConfig {
       maxPeopleCooldownSeconds:
       (json['maxPeopleCooldownSeconds'] as num?)?.toInt() ?? 300,
       maxPeopleSchedule: json['maxPeopleSchedule'] != null
-          ? AlertSchedule.fromJson(json['maxPeopleSchedule'])
+          ? AlertSchedule.fromMap(json['maxPeopleSchedule'])
           : null,
 
       // Absent
@@ -139,7 +139,7 @@ class CameraConfig {
       absentCooldownSeconds:
       (json['absentCooldownSeconds'] as num?)?.toInt() ?? 600,
       absentSchedule: json['absentSchedule'] != null
-          ? AlertSchedule.fromJson(json['absentSchedule'])
+          ? AlertSchedule.fromMap(json['absentSchedule'])
           : null,
 
       // Theft
@@ -147,7 +147,7 @@ class CameraConfig {
       theftCooldownSeconds:
       (json['theftCooldownSeconds'] as num?)?.toInt() ?? 300,
       theftSchedule: json['theftSchedule'] != null
-          ? AlertSchedule.fromJson(json['theftSchedule'])
+          ? AlertSchedule.fromMap(json['theftSchedule'])
           : null,
 
       // Restricted Area
@@ -163,7 +163,7 @@ class CameraConfig {
       (json['restrictedAreaCooldownSeconds'] as num?)?.toInt() ?? 300,
       restrictedAreaSchedule:
       json['restrictedAreaSchedule'] != null
-          ? AlertSchedule.fromJson(
+          ? AlertSchedule.fromMap(
         json['restrictedAreaSchedule'],
       )
           : null,
@@ -337,6 +337,7 @@ class CameraConfig {
 
   static Map<String, dynamic> _roiToJson(RoiAlertConfig c) {
     return {
+      // Local storage format (backward compatibility)
       'roi': {
         'l': c.roi.left,
         't': c.roi.top,
@@ -349,6 +350,103 @@ class CameraConfig {
         'x': c.direction.dx,
         'y': c.direction.dy,
       },
+      // Firebase format
+      'firebaseFormat': c.toFirebaseMap(),
+    };
+  }
+
+  // ============================================================
+  // FIRESTORE CONVERSION HELPERS
+  // ============================================================
+  
+  /// Convert footfall config to AlgorithmConfig for Firebase
+  static Map<String, dynamic> footfallToAlgorithmConfig(CameraConfig camera) {
+    return {
+      'enabled': camera.footfallEnabled,
+      'threshold': camera.confidenceThreshold,
+      'alertInterval': camera.footfallIntervalMinutes * 60, // Convert to seconds
+      'cooldownSeconds': 300, // Default cooldown
+      'appNotification': true,
+      'wpNotification': false,
+      'schedule': _alertScheduleToMap(camera.footfallSchedule),
+      // ROI Configuration
+      'roiConfig': camera.footfallConfig.toFirebaseMap(),
+      'roiCoordinates': [
+        camera.footfallConfig.roi.left,
+        camera.footfallConfig.roi.top,
+        camera.footfallConfig.roi.right,
+        camera.footfallConfig.roi.bottom,
+      ],
+      'lineCoordinates': [
+        camera.footfallConfig.lineStart.dx,
+        camera.footfallConfig.lineStart.dy,
+        camera.footfallConfig.lineEnd.dx,
+        camera.footfallConfig.lineEnd.dy,
+      ],
+      'roiType': 'line',
+    };
+  }
+  
+  /// Convert restricted area config to AlgorithmConfig for Firebase
+  static Map<String, dynamic> restrictedAreaToAlgorithmConfig(CameraConfig camera) {
+    return {
+      'enabled': camera.restrictedAreaEnabled,
+      'threshold': camera.confidenceThreshold,
+      'cooldownSeconds': camera.restrictedAreaCooldownSeconds,
+      'appNotification': true,
+      'wpNotification': false,
+      'schedule': _alertScheduleToMap(camera.restrictedAreaSchedule),
+      // ROI Configuration
+      'roiConfig': camera.restrictedAreaConfig.toFirebaseMap(),
+      'roiCoordinates': [
+        camera.restrictedAreaConfig.roi.left,
+        camera.restrictedAreaConfig.roi.top,
+        camera.restrictedAreaConfig.roi.right,
+        camera.restrictedAreaConfig.roi.bottom,
+      ],
+      'lineCoordinates': [
+        camera.restrictedAreaConfig.lineStart.dx,
+        camera.restrictedAreaConfig.lineStart.dy,
+        camera.restrictedAreaConfig.lineEnd.dx,
+        camera.restrictedAreaConfig.lineEnd.dy,
+      ],
+      'roiType': 'rectangle',
+    };
+  }
+  
+  /// Convert AlertSchedule to Firebase format
+  static Map<String, dynamic> _alertScheduleToMap(AlertSchedule? schedule) {
+    if (schedule == null) {
+      return {
+        'enabled': false,
+        'activeDays': ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+        'startMinute': 0,
+        'endMinute': 1439,
+      };
+    }
+    
+    // Parse time strings to get minutes since midnight
+    final startParts = schedule.startTime.split(':');
+    final endParts = schedule.endTime.split(':');
+    final startMinute = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+    final endMinute = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+    
+    return {
+      'enabled': true,
+      'activeDays': schedule.days.map((day) {
+        switch (day) {
+          case 1: return 'MON';
+          case 2: return 'TUE';
+          case 3: return 'WED';
+          case 4: return 'THU';
+          case 5: return 'FRI';
+          case 6: return 'SAT';
+          case 7: return 'SUN';
+          default: return 'MON';
+        }
+      }).toList(),
+      'startMinute': startMinute,
+      'endMinute': endMinute,
     };
   }
 

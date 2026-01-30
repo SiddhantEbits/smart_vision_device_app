@@ -99,7 +99,7 @@ devices/{deviceId}
 ```json
 {
   "pairedUserId": "string",
-  "hardwareName": "string",
+  "deviceName": "string",
   "status": "online | offline | error",
   "lastSeen": "Timestamp",
   "appVersion": "string",
@@ -220,10 +220,8 @@ devices/{deviceId}/cameras/{cameraId}/installerTests/{algorithmType}
 ```json
 {
   "algorithmType": "string",
-  "result": "PASS | FAIL",
+  "pass": "boolean",
   "testedAt": "Timestamp",
-  "testedBy": "string",
-  "notes": "string?",
   "createdAt": "Timestamp"
 }
 ```

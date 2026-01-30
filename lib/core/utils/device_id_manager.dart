@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
+import '../logging/logger_service.dart';
 
 class DeviceIdManager {
   static const String _deviceIdKey = 'device_id';
@@ -63,6 +64,20 @@ class DeviceIdManager {
   static Future<void> updateDeviceName(String deviceName) async {
     await saveDeviceName(deviceName);
     // Note: Firebase update should be called from controller to avoid circular dependency
+  }
+  
+  /// Clear device ID and force regeneration
+  static Future<void> clearDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_deviceIdKey);
+    _cachedDeviceId = null;
+    LoggerService.i('🗑️ Device ID cleared, will regenerate on next access');
+  }
+  
+  /// Force regenerate device ID (useful for migration)
+  static Future<String> forceRegenerateDeviceId() async {
+    await clearDeviceId();
+    return await getDeviceId();
   }
   
   /// Generate a new unique device ID

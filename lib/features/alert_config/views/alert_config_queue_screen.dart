@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/alert_flow_controller.dart';
+import '../../camera_setup/controller/camera_setup_controller.dart';
 import '../../../data/models/alert_config_model.dart';
+import '../../../data/models/camera_config.dart';
+import '../../../data/repositories/simple_storage_service.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/logging/logger_service.dart';
@@ -174,7 +177,7 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
     }
     
     // Save the config built in this step (without ROI for now)
-    flowController.saveConfig(AlertConfig(
+    final alertConfig = AlertConfig(
       type: currentType,
       threshold: sensitivity,
       cooldown: cooldown,
@@ -183,7 +186,13 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
       interval: additionalParams['absentInterval'],
       roiPoints: null, // Will be set in ROI screen
       roiType: null, // Will be set in ROI screen
-    ));
+    );
+
+    // Save to flow controller for navigation
+    flowController.saveConfig(alertConfig);
+
+    // Save alert configuration to current camera in local storage
+    _saveAlertConfigToCurrentCamera(currentType, alertConfig);
 
     // Check if we need to go to ROI screen or go to testing
     if (currentType == DetectionType.footfallDetection || currentType == DetectionType.restrictedArea) {
@@ -588,6 +597,92 @@ class _AlertConfigQueueScreenState extends State<AlertConfigQueueScreen> {
         // These don't have additional specific fields beyond ROI
         return const SizedBox();
     }
+  }
+
+  void _saveAlertConfigToCurrentCamera(DetectionType detectionType, AlertConfig alertConfig) {
+    try {
+      // Get the current camera from CameraSetupController
+      final cameraSetupController = Get.find<CameraSetupController>();
+      final currentCamera = cameraSetupController.currentCamera;
+      
+      if (currentCamera == null) {
+        LoggerService.w('❌ No current camera found to save alert configuration');
+        Get.snackbar(
+          'Error',
+          'No camera selected. Please select a camera first.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Create a copy of the current camera with updated alert configuration
+      final updatedCamera = _applyAlertConfigToCamera(currentCamera, detectionType, alertConfig);
+      
+      // Update the camera in the list
+      final cameraIndex = cameraSetupController.cameras.indexWhere((c) => c.name == currentCamera.name);
+      if (cameraIndex != -1) {
+        cameraSetupController.updateCamera(cameraIndex, updatedCamera); // Use public method
+        
+        LoggerService.i('✅ Alert configuration saved to camera: ${currentCamera.name} for detection: $detectionType');
+        
+        Get.snackbar(
+          'Configuration Saved',
+          'Alert settings saved to ${currentCamera.name}',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        LoggerService.e('❌ Camera not found in list: ${currentCamera.name}');
+      }
+    } catch (e) {
+      LoggerService.e('❌ Failed to save alert configuration to camera', e);
+      Get.snackbar(
+        'Save Failed',
+        'Failed to save alert configuration: ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  CameraConfig _applyAlertConfigToCamera(CameraConfig camera, DetectionType detectionType, AlertConfig alertConfig) {
+    // Create a copy of the camera with updated alert configuration
+    final updatedCamera = CameraConfig(
+      name: camera.name,
+      url: camera.url,
+      confidenceThreshold: camera.confidenceThreshold,
+      
+      // Apply detection-specific settings
+      peopleCountEnabled: detectionType == DetectionType.crowdDetection ? true : camera.peopleCountEnabled,
+      maxPeople: detectionType == DetectionType.crowdDetection ? alertConfig.maxCapacity ?? camera.maxPeople : camera.maxPeople,
+      maxPeopleCooldownSeconds: detectionType == DetectionType.crowdDetection ? alertConfig.cooldown : camera.maxPeopleCooldownSeconds,
+      maxPeopleSchedule: detectionType == DetectionType.crowdDetection ? alertConfig.schedule : camera.maxPeopleSchedule,
+      
+      footfallEnabled: detectionType == DetectionType.footfallDetection ? true : camera.footfallEnabled,
+      footfallIntervalMinutes: detectionType == DetectionType.footfallDetection ? alertConfig.interval ?? camera.footfallIntervalMinutes : camera.footfallIntervalMinutes,
+      footfallSchedule: detectionType == DetectionType.footfallDetection ? alertConfig.schedule : camera.footfallSchedule,
+      
+      restrictedAreaEnabled: detectionType == DetectionType.restrictedArea ? true : camera.restrictedAreaEnabled,
+      restrictedAreaCooldownSeconds: detectionType == DetectionType.restrictedArea ? alertConfig.cooldown : camera.restrictedAreaCooldownSeconds,
+      restrictedAreaSchedule: detectionType == DetectionType.restrictedArea ? alertConfig.schedule : camera.restrictedAreaSchedule,
+      
+      theftAlertEnabled: detectionType == DetectionType.sensitiveAlert ? true : camera.theftAlertEnabled,
+      theftCooldownSeconds: detectionType == DetectionType.sensitiveAlert ? alertConfig.cooldown : camera.theftCooldownSeconds,
+      theftSchedule: detectionType == DetectionType.sensitiveAlert ? alertConfig.schedule : camera.theftSchedule,
+      
+      absentAlertEnabled: detectionType == DetectionType.absentAlert ? true : camera.absentAlertEnabled,
+      absentSeconds: detectionType == DetectionType.absentAlert ? alertConfig.interval ?? camera.absentSeconds : camera.absentSeconds,
+      absentCooldownSeconds: detectionType == DetectionType.absentAlert ? alertConfig.cooldown : camera.absentCooldownSeconds,
+      absentSchedule: detectionType == DetectionType.absentAlert ? alertConfig.schedule : camera.absentSchedule,
+      
+      // Preserve ROI configurations
+      footfallConfig: camera.footfallConfig,
+      restrictedAreaConfig: camera.restrictedAreaConfig,
+    );
+    
+    return updatedCamera;
   }
 
 }

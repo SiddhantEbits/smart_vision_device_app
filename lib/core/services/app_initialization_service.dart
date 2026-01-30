@@ -414,10 +414,11 @@ class AppInitializationService {
         // Re-validate imported data
         await _validateStoredData();
         
-        // Trigger sync if available
-        if (_firebaseSync.isInitialized) {
-          await _firebaseSync.fullSync();
-        }
+        // DISABLED: Firebase sync should only happen when user presses "Finish Setup"
+        // if (_firebaseSync.isInitialized) {
+        //   await _firebaseSync.fullSync();
+        // }
+        debugPrint('📝 Firebase sync disabled - will sync only on Finish Setup');
       } else {
         debugPrint('❌ Data import failed');
       }

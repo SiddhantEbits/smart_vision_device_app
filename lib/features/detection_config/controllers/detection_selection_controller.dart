@@ -39,7 +39,7 @@ class DetectionSelectionController extends GetxController {
     ),
   ];
 
-  final selectedDetections = <model.DetectionType>{}.obs;
+  final RxSet<model.DetectionType> selectedDetections = <model.DetectionType>{}.obs;
 
   @override
   void onInit() {
@@ -70,6 +70,7 @@ class DetectionSelectionController extends GetxController {
     }
     
     debugPrint('[DETECTION] New selections: ${selectedDetections.toList()}');
+    selectedDetections.refresh(); // Force UI update
   }
 
   void proceedToConfiguration() {

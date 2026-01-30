@@ -9,7 +9,7 @@ import 'dart:convert';
 class FirestoreDevice {
   final String deviceId;
   final String? pairedUserId;
-  final String? hardwareName;
+  final String? deviceName;
   final DeviceStatus status;
   final Timestamp lastSeen;
   final String? appVersion;
@@ -28,7 +28,7 @@ class FirestoreDevice {
   const FirestoreDevice({
     required this.deviceId,
     this.pairedUserId,
-    this.hardwareName,
+    this.deviceName,
     required this.status,
     required this.lastSeen,
     this.appVersion,
@@ -53,7 +53,7 @@ class FirestoreDevice {
     return FirestoreDevice(
       deviceId: doc.id,
       pairedUserId: data['pairedUserId'],
-      hardwareName: data['hardwareName'],
+      deviceName: data['deviceName'],
       status: DeviceStatus.fromString(data['status'] ?? 'offline'),
       lastSeen: data['lastSeen'] as Timestamp,
       appVersion: data['appVersion'],
@@ -74,7 +74,7 @@ class FirestoreDevice {
   Map<String, dynamic> toFirestore() {
     return {
       'pairedUserId': pairedUserId,
-      'hardwareName': hardwareName,
+      'deviceName': deviceName,
       'status': status.value,
       'lastSeen': lastSeen,
       'appVersion': appVersion,
@@ -94,7 +94,7 @@ class FirestoreDevice {
 
   FirestoreDevice copyWith({
     String? pairedUserId,
-    String? hardwareName,
+    String? deviceName,
     DeviceStatus? status,
     Timestamp? lastSeen,
     String? appVersion,
@@ -112,7 +112,7 @@ class FirestoreDevice {
     return FirestoreDevice(
       deviceId: deviceId,
       pairedUserId: pairedUserId ?? this.pairedUserId,
-      hardwareName: hardwareName ?? this.hardwareName,
+      deviceName: deviceName ?? this.deviceName,
       status: status ?? this.status,
       lastSeen: lastSeen ?? this.lastSeen,
       appVersion: appVersion ?? this.appVersion,
@@ -228,6 +228,12 @@ class AlgorithmConfig {
   final bool appNotification;
   final bool wpNotification;
   final ScheduleConfig schedule;
+  
+  // ROI Configuration Fields
+  final Map<String, dynamic>? roiConfig; // Complete ROI configuration
+  final List<double>? roiCoordinates; // ROI rectangle [left, top, right, bottom] (normalized 0-1)
+  final List<double>? lineCoordinates; // Line coordinates [startX, startY, endX, endY] (normalized 0-1)
+  final String? roiType; // 'rectangle' or 'line' or 'polygon'
 
   const AlgorithmConfig({
     required this.enabled,
@@ -239,6 +245,10 @@ class AlgorithmConfig {
     this.appNotification = true,
     this.wpNotification = false,
     required this.schedule,
+    this.roiConfig,
+    this.roiCoordinates,
+    this.lineCoordinates,
+    this.roiType,
   });
 
   factory AlgorithmConfig.fromMap(Map<String, dynamic> map) {
@@ -252,6 +262,11 @@ class AlgorithmConfig {
       appNotification: map['appNotification'] ?? true,
       wpNotification: map['wpNotification'] ?? false,
       schedule: ScheduleConfig.fromMap(map['schedule'] ?? {}),
+      // ROI Configuration
+      roiConfig: map['roiConfig'] as Map<String, dynamic>?,
+      roiCoordinates: (map['roiCoordinates'] as List<dynamic>?)?.cast<double>(),
+      lineCoordinates: (map['lineCoordinates'] as List<dynamic>?)?.cast<double>(),
+      roiType: map['roiType'] as String?,
     );
   }
 
@@ -266,6 +281,11 @@ class AlgorithmConfig {
       'appNotification': appNotification,
       'wpNotification': wpNotification,
       'schedule': schedule.toMap(),
+      // ROI Configuration
+      if (roiConfig != null) 'roiConfig': roiConfig,
+      if (roiCoordinates != null) 'roiCoordinates': roiCoordinates,
+      if (lineCoordinates != null) 'lineCoordinates': lineCoordinates,
+      if (roiType != null) 'roiType': roiType,
     };
   }
 
@@ -303,6 +323,10 @@ class AlgorithmConfig {
     bool? appNotification,
     bool? wpNotification,
     ScheduleConfig? schedule,
+    Map<String, dynamic>? roiConfig,
+    List<double>? roiCoordinates,
+    List<double>? lineCoordinates,
+    String? roiType,
   }) {
     return AlgorithmConfig(
       enabled: enabled ?? this.enabled,
@@ -314,6 +338,10 @@ class AlgorithmConfig {
       appNotification: appNotification ?? this.appNotification,
       wpNotification: wpNotification ?? this.wpNotification,
       schedule: schedule ?? this.schedule,
+      roiConfig: roiConfig ?? this.roiConfig,
+      roiCoordinates: roiCoordinates ?? this.roiCoordinates,
+      lineCoordinates: lineCoordinates ?? this.lineCoordinates,
+      roiType: roiType ?? this.roiType,
     );
   }
 

@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✅ TOP-LEVEL alertLogs (THIS IS WHAT YOUR QUERY NEEDS)
+    match /alertLogs/{alertId} {
+      allow read, write: if true;
+    }
+
+		match /users/{usersId} {
+      allow read, write: if true;
+    }
+    
+    // ✅ DEVICES with full access including installerTests
+    match /devices/{deviceId} {
+      allow read, write: if true;
+
+      // ✅ CAMERAS with full access
+      match /cameras/{cameraId} {
+        allow read, write: if true;
+        
+        // ✅ INSTALLER TESTS with full access (FIXED)
+        match /installerTests/{algorithmType} {
+          allow read, write: if true;
+        }
+      }
+    }
+  }
+}

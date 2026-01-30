@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/constants/app_routes.dart';
-import '../../../data/repositories/local_storage_service.dart';
+import '../../../data/repositories/simple_storage_service.dart';
 
 class WhatsAppSetupController extends GetxController {
   final TextEditingController phoneController = TextEditingController();
@@ -76,10 +76,10 @@ class WhatsAppSetupController extends GetxController {
         final phoneNumber = phoneController.text.trim();
         
         // Save phone number to local storage
-        await LocalStorageService.instance.addWhatsAppPhoneNumber(phoneNumber);
+        await SimpleStorageService.instance.addWhatsAppPhoneNumber(phoneNumber);
         
         // Enable WhatsApp alerts
-        await LocalStorageService.instance.setWhatsAppAlertsEnabled(true);
+        await SimpleStorageService.instance.setWhatsAppAlertsEnabled(true);
         
         debugPrint('✅ WhatsApp phone number saved: $phoneNumber');
         debugPrint('✅ WhatsApp alerts enabled');

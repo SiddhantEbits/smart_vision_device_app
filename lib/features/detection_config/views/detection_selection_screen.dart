@@ -85,13 +85,13 @@ class DetectionSelectionScreen extends StatelessWidget {
                     
                     return GestureDetector(
                       onTap: () => controller.toggleDetection(item.type),
-                      child: Container(
+                      child: Obx(() => Container(
                         padding: EdgeInsets.all(16.adaptSize),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : AppTheme.surfaceColor,
+                          color: controller.isSelected(item.type) ? AppTheme.primaryColor.withOpacity(0.1) : AppTheme.surfaceColor,
                           borderRadius: BorderRadius.circular(24.adaptSize),
                           border: Border.all(
-                            color: isSelected ? AppTheme.primaryColor : Colors.white10,
+                            color: controller.isSelected(item.type) ? AppTheme.primaryColor : Colors.white10,
                             width: 2.adaptSize,
                           ),
                         ),
@@ -101,7 +101,7 @@ class DetectionSelectionScreen extends StatelessWidget {
                             Icon(
                               item.icon,
                               size: 28.adaptSize,
-                              color: isSelected ? AppTheme.primaryColor : Colors.white70,
+                              color: controller.isSelected(item.type) ? AppTheme.primaryColor : Colors.white70,
                             ),
                             SizedBox(height: 6.adaptSize),
                             Text(
@@ -117,13 +117,13 @@ class DetectionSelectionScreen extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: isSelected ? Colors.white70 : AppTheme.mutedTextColor,
+                                color: controller.isSelected(item.type) ? Colors.white70 : AppTheme.mutedTextColor,
                                 fontSize: 12.adaptSize,
                               ),
                             ),
                           ],
                         ),
-                      ),
+                      )),
                     );
                   },
                 );

@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../data/models/alert_config_model.dart';
 import '../../../data/services/yolo_service.dart';
+import '../../../data/repositories/simple_storage_service.dart';
 import '../../../core/constants/responsive_num_extension.dart';
 import '../../../core/theme/app_theme.dart';
 import '../controller/alert_flow_controller.dart';
@@ -184,10 +185,13 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> {
       await _stopTest();
     }
     
+    // Save test result to local storage
+    await _saveTestResultToLocal();
+    
     setState(() {
       verified = true;
       isTestRunning = false;
-      testMessage = 'Detection verified! FFmpeg and YOLO stopped. Click "Next Detection" to continue.';
+      testMessage = 'Detection verified! Test result saved locally. Click "Next Detection" to continue.';
     });
   }
 
@@ -838,6 +842,69 @@ class _DetectionTestingScreenState extends State<DetectionTestingScreen> {
             fontWeight: FontWeight.bold,
           ),
         );
+    }
+  }
+
+  Future<void> _saveTestResultToLocal() async {
+    try {
+      // Get the current camera
+      final currentCamera = cameraSetupController.currentCamera;
+      
+      if (currentCamera == null) {
+        print('❌ No current camera found to save test result');
+        return;
+      }
+
+      // Create test result data
+      final testResultData = {
+        'algorithmType': _getAlgorithmTypeString(detectionType),
+        'pass': testResult, // Use the testResult variable that indicates if test passed
+        'testedAt': DateTime.now().toIso8601String(),
+      };
+
+      // Save to SimpleStorageService
+      final localStorage = SimpleStorageService.instance;
+      await localStorage.saveInstallerTest(
+        cameraId: currentCamera.name,
+        algorithmType: _getAlgorithmTypeString(detectionType),
+        pass: testResult,
+      );
+      
+      print('✅ Test result saved locally for camera: ${currentCamera.name}');
+      print('📋 Test result: $testResultData');
+      
+      // Show success feedback
+      Get.snackbar(
+        'Test Result Saved',
+        'Detection test saved for ${currentCamera.name}',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      
+    } catch (e) {
+      print('❌ Failed to save test result locally: $e');
+      Get.snackbar(
+        'Save Failed',
+        'Failed to save test result: ${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  String _getAlgorithmTypeString(DetectionType detectionType) {
+    switch (detectionType) {
+      case DetectionType.crowdDetection:
+        return 'crowdDetection';
+      case DetectionType.footfallDetection:
+        return 'footfallDetection';
+      case DetectionType.restrictedArea:
+        return 'restrictedArea';
+      case DetectionType.sensitiveAlert:
+        return 'sensitiveAlert';
+      case DetectionType.absentAlert:
+        return 'absentAlert';
     }
   }
 }

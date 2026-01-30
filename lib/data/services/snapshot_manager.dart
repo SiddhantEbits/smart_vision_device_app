@@ -1,13 +1,17 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/logging/logger_service.dart';
 import 'rtsp_snapshot_service.dart';
+import 'frame_snapshot_service.dart';
+import '../../features/monitoring/controller/monitoring_controller.dart';
 
 class SnapshotManager extends GetxService {
   final RTSPSnapshotService _rtspService = Get.find<RTSPSnapshotService>();
+  final FrameSnapshotService _frameService = Get.find<FrameSnapshotService>();
 
   // Cache snapshots for 2 seconds to avoid RTSP spam for rapid alerts
   final Map<String, ({File file, DateTime timestamp})> _snapshotCache = {};
@@ -23,20 +27,39 @@ class SnapshotManager extends GetxService {
       File? highResFile;
       String? lowResPath;
 
-      // 1. Check Cache
-      final cached = _snapshotCache[cameraName];
-      if (cached != null) {
-        final age = DateTime.now().difference(cached.timestamp);
-        if (age.inSeconds < 2 && await cached.file.exists()) {
-          LoggerService.d("♻️ Reusing recent snapshot for $cameraName");
-          highResFile = cached.file;
-        } else {
-          _snapshotCache.remove(cameraName);
+      // 1. Try to get current frame from MonitoringController first
+      try {
+        final monitoringController = Get.find<MonitoringController>();
+        final currentFrame = monitoringController.getCurrentFrame();
+        
+        if (currentFrame != null && currentFrame.isNotEmpty) {
+          LoggerService.d("🎯 Using current frame for snapshot: $cameraName");
+          highResFile = await _frameService.captureSnapshot(currentFrame, cameraName: cameraName);
+          if (highResFile != null) {
+            _snapshotCache[cameraName] = (file: highResFile, timestamp: DateTime.now());
+          }
+        }
+      } catch (e) {
+        LoggerService.w("Could not get current frame, falling back to RTSP: $e");
+      }
+
+      // 2. Check Cache if frame approach failed
+      if (highResFile == null) {
+        final cached = _snapshotCache[cameraName];
+        if (cached != null) {
+          final age = DateTime.now().difference(cached.timestamp);
+          if (age.inSeconds < 2 && await cached.file.exists()) {
+            LoggerService.d("♻️ Reusing recent snapshot for $cameraName");
+            highResFile = cached.file;
+          } else {
+            _snapshotCache.remove(cameraName);
+          }
         }
       }
 
-      // 2. Capture New if needed
+      // 3. Capture New via RTSP if still needed
       if (highResFile == null) {
+        LoggerService.d("📸 Trying RTSP snapshot for $cameraName");
         highResFile = await _rtspService.captureSnapshot(rtspUrl, cameraName: cameraName);
         if (highResFile != null) {
           _snapshotCache[cameraName] = (file: highResFile, timestamp: DateTime.now());
@@ -46,12 +69,14 @@ class SnapshotManager extends GetxService {
       if (highResFile == null) {
         final existing = _persistentSnapshots[cameraName];
         if (existing != null && await existing.exists()) {
+          LoggerService.w("📁 Using existing persistent snapshot for $cameraName");
           return SnapshotResult(highResFile: existing, lowResPath: existing.path);
         }
+        LoggerService.e("❌ No snapshot available for $cameraName");
         return SnapshotResult(highResFile: null, lowResPath: null);
       }
 
-      // 3. Save for long-term logs (7-day retention)
+      // 4. Save for long-term logs (7-day retention)
       if (AppConstants.testMode) {
         lowResPath = await _saveForLogs(highResFile, cameraName);
         if (lowResPath != null) {
@@ -59,6 +84,7 @@ class SnapshotManager extends GetxService {
         }
       }
 
+      LoggerService.i("✅ Snapshot captured successfully for $cameraName");
       return SnapshotResult(
         highResFile: highResFile,
         lowResPath: lowResPath,

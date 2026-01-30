@@ -5,7 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/camera_config.dart';
-import '../models/alert_schedule.dart';
+import '../models/alert_config_model.dart' hide AlertSchedule;
+import '../models/alert_config_model.dart' as alert_model show AlertSchedule;
 import '../repositories/local_storage_service.dart';
 
 /// ===========================================================
@@ -242,7 +243,7 @@ class DeviceCameraFirebaseService {
         'absentAlert': {
           'enabled': config.absentAlertEnabled,
           'threshold': config.confidenceThreshold,
-          'alsentniterval': 5, // Fixed value as per schema (note: typo in original schema)
+          'absentInterval': 5, // Fixed value as per schema (note: typo in original schema)
           'cooldownSeconds': config.absentCooldownSeconds,
           'appNotification': true,
           'wpNotification': false,
@@ -290,7 +291,7 @@ class DeviceCameraFirebaseService {
       
       // Absent Alert
       absentAlertEnabled: absentAlertAlg['enabled'] ?? false,
-      absentSeconds: (absentAlertAlg['alsentniterval'] as num?)?.toInt() ?? 5, // Note: using typo from schema
+      absentSeconds: (absentAlertAlg['absentInterval'] as num?)?.toInt() ?? 5, // Note: using typo from schema
       absentCooldownSeconds: (absentAlertAlg['cooldownSeconds'] as num?)?.toInt() ?? 300,
       absentSchedule: _convertFirebaseScheduleToSchedule(absentAlertAlg['schedule']),
       
@@ -300,36 +301,31 @@ class DeviceCameraFirebaseService {
   }
 
   /// Convert AlertSchedule to Firebase schedule schema
-  Map<String, dynamic>? _convertScheduleToFirebaseSchema(AlertSchedule? schedule) {
+  Map<String, dynamic>? _convertScheduleToFirebaseSchema(alert_model.AlertSchedule? schedule) {
     if (schedule == null) return null;
     
     return {
-      'enabled': schedule.activeDays.isNotEmpty,
-      'activeDays': schedule.activeDays.map((d) => _dayLabel(d)).toList(),
-      'startMinute': schedule.start.hour * 60 + schedule.start.minute,
-      'endMinute': schedule.end.hour * 60 + schedule.end.minute,
+      'enabled': true,
+      'activeDays': _convertDaysToFirebase(schedule.days),
+      'startMinute': schedule.startTime,
+      'endMinute': schedule.endTime,
     };
   }
 
   /// Convert Firebase schedule schema to AlertSchedule
-  AlertSchedule? _convertFirebaseScheduleToSchedule(dynamic scheduleData) {
+  alert_model.AlertSchedule? _convertFirebaseScheduleToSchedule(dynamic scheduleData) {
     if (scheduleData == null) return null;
     
     final data = scheduleData as Map<String, dynamic>;
     
-    // Convert day labels back to numbers
-    final dayLabels = (data['activeDays'] as List?)?.cast<String>() ?? [];
-    final activeDays = dayLabels.map(_labelToDay).where((d) => d != null).cast<int>().toList();
-    
-    if (activeDays.isEmpty) return null;
-    
+    final activeDays = _convertDaysFromFirebase((data['activeDays'] as List?)?.cast<String>() ?? []);
     final startMinute = (data['startMinute'] as num?)?.toInt() ?? 0;
     final endMinute = (data['endMinute'] as num?)?.toInt() ?? 0;
     
-    return AlertSchedule(
-      start: TimeOfDay(hour: startMinute ~/ 60, minute: startMinute % 60),
-      end: TimeOfDay(hour: endMinute ~/ 60, minute: endMinute % 60),
-      activeDays: activeDays,
+    return alert_model.AlertSchedule(
+      startTime: data['startTime'] ?? '00:00',
+      endTime: data['endTime'] ?? '23:59',
+      days: activeDays,
     );
   }
 
@@ -339,6 +335,36 @@ class DeviceCameraFirebaseService {
     final bytes = utf8.encode(url);
     final encryptedHmac = Hmac(sha256, key).convert(bytes);
     return 'ENC:AES256-GCM:${base64.encode(encryptedHmac.bytes)}';
+  }
+
+  /// Convert days list (1-7) to Firebase format (MON-SUN)
+  List<String> _convertDaysToFirebase(List<int> days) {
+    const dayMap = {
+      1: 'MON',
+      2: 'TUE', 
+      3: 'WED',
+      4: 'THU',
+      5: 'FRI',
+      6: 'SAT',
+      7: 'SUN',
+    };
+    
+    return days.map((day) => dayMap[day] ?? 'MON').toList();
+  }
+
+  /// Convert Firebase format (MON-SUN) to days list (1-7)
+  List<int> _convertDaysFromFirebase(List<String> firebaseDays) {
+    const dayMap = {
+      'MON': 1,
+      'TUE': 2,
+      'WED': 3,
+      'THU': 4,
+      'FRI': 5,
+      'SAT': 6,
+      'SUN': 7,
+    };
+    
+    return firebaseDays.map((day) => dayMap[day] ?? 1).toList();
   }
 
   /// Helper method to convert day number to label

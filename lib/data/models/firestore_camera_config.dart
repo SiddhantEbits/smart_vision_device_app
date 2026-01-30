@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'camera_config.dart';
-import 'alert_schedule.dart';
+import 'alert_config_model.dart' hide AlertSchedule;
+import 'alert_config_model.dart' as alert_model show AlertSchedule;
 import 'roi_config.dart';
 import 'firestore_models.dart';
 
@@ -23,31 +24,31 @@ class FirestoreCameraConfig {
   /// ================= FOOTFALL =================
   final bool footfallEnabled;
   final RoiAlertConfig footfallConfig;
-  final AlertSchedule? footfallSchedule;
+  final alert_model.AlertSchedule? footfallSchedule;
   final int footfallIntervalMinutes;
 
   /// ================= MAX PEOPLE ALERT =================
   final bool maxPeopleEnabled;
   final int maxPeople;
   final int maxPeopleCooldownSeconds;
-  final AlertSchedule? maxPeopleSchedule;
+  final alert_model.AlertSchedule? maxPeopleSchedule;
 
   /// ================= ABSENT ALERT =================
   final bool absentAlertEnabled;
   final int absentSeconds;
   final int absentCooldownSeconds;
-  final AlertSchedule? absentSchedule;
+  final alert_model.AlertSchedule? absentSchedule;
 
   /// ================= THEFT ALERT =================
   final bool theftAlertEnabled;
   final int theftCooldownSeconds;
-  final AlertSchedule? theftSchedule;
+  final alert_model.AlertSchedule? theftSchedule;
 
   /// ================= RESTRICTED AREA =================
   final bool restrictedAreaEnabled;
   final RoiAlertConfig restrictedAreaConfig;
   final int restrictedAreaCooldownSeconds;
-  final AlertSchedule? restrictedAreaSchedule;
+  final alert_model.AlertSchedule? restrictedAreaSchedule;
 
   /// ================= YOLO =================
   final double confidenceThreshold;
@@ -207,27 +208,27 @@ class FirestoreCameraConfig {
 
     bool? footfallEnabled,
     RoiAlertConfig? footfallConfig,
-    AlertSchedule? footfallSchedule,
+    alert_model.AlertSchedule? footfallSchedule,
     int? footfallIntervalMinutes,
 
     bool? maxPeopleEnabled,
     int? maxPeople,
     int? maxPeopleCooldownSeconds,
-    AlertSchedule? maxPeopleSchedule,
+    alert_model.AlertSchedule? maxPeopleSchedule,
 
     bool? absentAlertEnabled,
     int? absentSeconds,
     int? absentCooldownSeconds,
-    AlertSchedule? absentSchedule,
+    alert_model.AlertSchedule? absentSchedule,
 
     bool? theftAlertEnabled,
     int? theftCooldownSeconds,
-    AlertSchedule? theftSchedule,
+    alert_model.AlertSchedule? theftSchedule,
 
     bool? restrictedAreaEnabled,
     RoiAlertConfig? restrictedAreaConfig,
     int? restrictedAreaCooldownSeconds,
-    AlertSchedule? restrictedAreaSchedule,
+    alert_model.AlertSchedule? restrictedAreaSchedule,
 
     double? confidenceThreshold,
   }) {
@@ -435,27 +436,19 @@ class FirestoreCameraConfig {
     };
   }
 
-  static AlertSchedule _scheduleFromFirestore(Map<String, dynamic> json) {
-    return AlertSchedule(
-      start: TimeOfDay(
-        hour: json['startHour'],
-        minute: json['startMinute'],
-      ),
-      end: TimeOfDay(
-        hour: json['endHour'],
-        minute: json['endMinute'],
-      ),
-      activeDays: List<int>.from(json['activeDays'] ?? []),
+  static alert_model.AlertSchedule _scheduleFromFirestore(Map<String, dynamic> json) {
+    return alert_model.AlertSchedule(
+      startTime: json['startTime'] ?? '00:00',
+      endTime: json['endTime'] ?? '23:59',
+      days: List<int>.from(json['days'] ?? [1, 2, 3, 4, 5, 6, 7]),
     );
   }
 
-  static Map<String, dynamic> _scheduleToFirestore(AlertSchedule schedule) {
+  static Map<String, dynamic> _scheduleToFirestore(alert_model.AlertSchedule schedule) {
     return {
-      'startHour': schedule.start.hour,
-      'startMinute': schedule.start.minute,
-      'endHour': schedule.end.hour,
-      'endMinute': schedule.end.minute,
-      'activeDays': schedule.activeDays,
+      'startTime': schedule.startTime,
+      'endTime': schedule.endTime,
+      'days': schedule.days,
     };
   }
 

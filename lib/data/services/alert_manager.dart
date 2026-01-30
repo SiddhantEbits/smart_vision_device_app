@@ -9,7 +9,6 @@ import '../../../core/constants/app_constants.dart';
 
 class AlertManager extends GetxService {
   final CooldownManager _cooldownManager = Get.find<CooldownManager>();
-  final WhatsAppAlertService _whatsapp = Get.find<WhatsAppAlertService>();
   final SnapshotManager _snapshotManager = Get.find<SnapshotManager>();
   final CameraLogService _logService = Get.find<CameraLogService>();
   
@@ -62,7 +61,7 @@ class AlertManager extends GetxService {
         cooldownSeconds: config.cooldown,
       )) {
         _dispatchAlert(DetectionType.crowdDetection, 'Crowd Alert: $count people detected.', 
-            rtspUrl: rtspUrl, cameraName: camName);
+            rtspUrl: rtspUrl, cameraName: camName, maxCount: count, maxLimit: config.maxCapacity);
       }
     }
   }
@@ -107,11 +106,15 @@ class AlertManager extends GetxService {
 
   void _checkFootfall(AlertConfig config, int increment, String rtspUrl, String camName) {
     _dispatchAlert(DetectionType.footfallDetection, 'Footfall: $increment person(s) crossed.', 
-        detectionCount: increment, rtspUrl: rtspUrl, cameraName: camName);
+        detectionCount: increment, rtspUrl: rtspUrl, cameraName: camName, footfallCount: increment, hours: 1);
   }
 
   Future<void> _dispatchAlert(DetectionType type, String message, {
     int? detectionCount,
+    int? maxCount,
+    int? maxLimit,
+    int? footfallCount,
+    int? hours,
     required String rtspUrl,
     required String cameraName,
   }) async {
@@ -140,12 +143,22 @@ class AlertManager extends GetxService {
       case DetectionType.footfallDetection: whatsAppType = "footFall"; break;
     }
 
-    await _whatsapp.sendAlert(
-      mediaFile: snapshot.highResFile,
-      alertType: whatsAppType,
-      cameraNo: cameraName,
-      detectionCount: detectionCount,
-    );
+    // Only send WhatsApp alert if we have a high-res snapshot (except for footFall)
+    if (whatsAppType == "footFall" || snapshot.highResFile != null) {
+      await WhatsAppAlertService.sendAlert(
+        mediaFile: snapshot.highResFile,
+        mediaType: "image",
+        alertType: whatsAppType,
+        cameraNo: cameraName,
+        detectionCount: detectionCount,
+        maxCount: maxCount,
+        maxLimit: maxLimit,
+        footfallCount: footfallCount,
+        hours: hours,
+      );
+    } else {
+      LoggerService.w('⚠️ Alert processed but no snapshot captured for WhatsApp: $type');
+    }
   }
 
   void reset() {
